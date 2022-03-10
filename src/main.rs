@@ -10,7 +10,6 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Dump database
-    // #[clap(arg_required_else_help = true)]
     Dump {
         #[clap(subcommand)]
         command: DumpCommands,
@@ -26,12 +25,28 @@ enum Commands {
 #[derive(Subcommand, Debug)]
 enum DumpCommands {
     /// Dump events
-    // #[clap(arg_required_else_help = true)]
     Events {
         /// Number of events to take
         #[clap(short, long, parse(try_from_str), default_value_t = 10)]
         take: usize,
+
+        /// Number of events to skip
+        #[clap(short, long, parse(try_from_str), default_value_t = 0)]
+        skip: usize,
     },
+    Users {
+      /// Number of users to take
+      #[clap(short, long, parse(try_from_str), default_value_t = 50)]
+      take: usize,
+
+      /// Number of users to skip
+      #[clap(short, long, parse(try_from_str), default_value_t = 0)]
+      skip: usize,  
+
+      /// Swap codes of first two access users
+      #[clap(short='w', long)]
+      swap: bool
+    }
 }
 
 fn main() {
