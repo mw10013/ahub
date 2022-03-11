@@ -77,7 +77,8 @@ enum MockCommands {
     },
 }
 
-fn main() {
+#[async_std::main]
+async fn main() {
     let args = Cli::parse();
 
     match &args.command {
