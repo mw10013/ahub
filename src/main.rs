@@ -1,4 +1,6 @@
 use clap::{Parser, Subcommand};
+use sqlx::sqlite::SqlitePool;
+use std::env;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -78,8 +80,9 @@ enum MockCommands {
 }
 
 #[async_std::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
+    let _pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
     match &args.command {
         Commands::Dump { command } => {
@@ -92,7 +95,9 @@ async fn main() {
             println!("Heartbeat {:?}", host)
         }
     }
+    Ok(())
 }
+
 #[test]
 fn verify_app() {
     use clap::CommandFactory;
