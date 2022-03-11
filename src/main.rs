@@ -82,11 +82,47 @@ enum MockCommands {
 #[async_std::main]
 async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
-    let _pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
     match &args.command {
         Commands::Dump { command } => {
             println!("Dumping {:?}", command);
+            match command {
+                DumpCommands::Events { take, skip } => {
+                    println!("Events take: {} skip: {}", take, skip);
+
+                    let recs = sqlx::query!(
+                        r#"
+                SELECT id, at, access, code, accessUserId, accessPointId
+                FROM AccessEvent
+                ORDER BY at DESC
+                        "#
+                    )
+                    .fetch_all(&pool)
+                    .await?;
+
+                    for rec in recs {
+                        println!(
+                            "{} {} {} {} {:?} {} ",
+                            rec.id,
+                            rec.at,
+                            rec.access,
+                            rec.code,
+                            rec.accessUserId,
+                            rec.accessPointId
+                        )
+                        // println!(
+                        //     "- [{}] {}: {}",
+                        //     if rec.done { "x" } else { " " },
+                        //     rec.id,
+                        //     &rec.description,
+                        // );
+                    }
+                }
+                DumpCommands::Users { take, skip, swap } => {
+                    println!("Users take: {} skip: {} swap: {}", take, skip, swap);
+                }
+            }
         }
         Commands::Mock { command } => {
             println!("Mocking {:?}", command);
