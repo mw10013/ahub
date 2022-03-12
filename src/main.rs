@@ -34,20 +34,20 @@ enum DumpCommands {
     Events {
         /// Number of events to take
         #[clap(short, long, parse(try_from_str), default_value_t = 10)]
-        take: usize,
+        take: i32,
 
         /// Number of events to skip
         #[clap(short, long, parse(try_from_str), default_value_t = 0)]
-        skip: usize,
+        skip: i32,
     },
     Users {
         /// Number of users to take
         #[clap(short, long, parse(try_from_str), default_value_t = 50)]
-        take: usize,
+        take: i32,
 
         /// Number of users to skip
         #[clap(short, long, parse(try_from_str), default_value_t = 0)]
-        skip: usize,
+        skip: i32,
 
         /// Swap codes of first two access users
         #[clap(short = 'w', long)]
@@ -92,35 +92,35 @@ async fn main() -> anyhow::Result<()> {
                     println!("Events take: {} skip: {}", take, skip);
 
                     let recs = sqlx::query!(
-                        r#"
+                        "
                 SELECT id, at, access, code, accessUserId, accessPointId
                 FROM AccessEvent
-                ORDER BY at DESC
-                        "#
+                ORDER BY at DESC LIMIT ? OFFSET ?",
+                        take,
+                        skip
                     )
                     .fetch_all(&pool)
                     .await?;
 
                     for rec in recs {
-                        println!(
-                            "{} {} {} {} {:?} {} ",
-                            rec.id,
-                            rec.at,
-                            rec.access,
-                            rec.code,
-                            rec.accessUserId,
-                            rec.accessPointId
-                        )
-                        // println!(
-                        //     "- [{}] {}: {}",
-                        //     if rec.done { "x" } else { " " },
-                        //     rec.id,
-                        //     &rec.description,
-                        // );
+                        println!("{:?}", rec);
                     }
                 }
                 DumpCommands::Users { take, skip, swap } => {
                     println!("Users take: {} skip: {} swap: {}", take, skip, swap);
+                    let recs = sqlx::query!(
+                        "
+select id, name, code, activateCodeAt, expireCodeAt 
+from AccessUser order by id asc limit ? offset ?",
+                        take,
+                        skip
+                    )
+                    .fetch_all(&pool)
+                    .await?;
+
+                    for rec in recs {
+                        println!("{:?}", rec);
+                    }
                 }
             }
         }
