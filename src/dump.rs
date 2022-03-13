@@ -1,8 +1,29 @@
-use sqlx::{sqlite::SqlitePool, Row};
 use futures::TryStreamExt;
+use sqlx::{sqlite::SqlitePool, Row};
 
-pub async fn dump_users(take: i32, skip: i32, swap: bool, pool: &SqlitePool) -> anyhow::Result<()> {
-    println!("dump_users: take: {} skip: {} swap: {}", take, skip, swap);
+pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
+    // println!("dump_events: {} skip: {}", take, skip);
+
+    let recs = sqlx::query!(
+        r#"
+                SELECT id, at, access, code, accessUserId, accessPointId
+                FROM AccessEvent
+                ORDER BY at DESC LIMIT ? OFFSET ?"#,
+        take,
+        skip
+    )
+    .fetch_all(pool)
+    .await?;
+
+    for rec in recs {
+        println!("{:?}", rec);
+    }
+
+    Ok(())
+}
+
+pub async fn dump_users(take: i32, skip: i32, _swap: bool, pool: &SqlitePool) -> anyhow::Result<()> {
+    // println!("dump_users: take: {} skip: {} swap: {}", take, skip, swap);
     // select id, name, code, activateCodeAt, expirecodeAt from AccessUser order by id asc limit 2;
     // select B, A from _AccessPointToAccessUser where B in (1, 2);
     // select id, name from AccessPoint where id in (1,2,3,4,5,6,7,8,1,2,5,6);
