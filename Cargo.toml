@@ -8,6 +8,7 @@ edition = "2021"
 
 [dependencies]
 clap = {version="=3.1.6", features=["derive", "cargo"]}
-sqlx = { version = "=0.5.11", features = [ "macros", "sqlite", "chrono", "runtime-async-std-native-tls" ] }
+sqlx = { version = "=0.5.11", features = [ "macros", "migrate", "sqlite", "chrono", "runtime-async-std-native-tls" ] }
 async-std = { version = "1.*", features = [ "attributes" ] }
 anyhow = "1.*"
+futures = "0.3"
