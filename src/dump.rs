@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use futures::TryStreamExt;
-use sqlx::{sqlite::SqlitePool, Row};
+use sqlx::sqlite::SqlitePool;
 
 pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
     let recs = sqlx::query!(
@@ -22,15 +22,38 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     Ok(())
 }
 
+#[derive(Debug)]
+struct User {
+    id: i64,
+    name: String,
+    code: String,
+    activate_code_at: Option<chrono::NaiveDateTime>,
+    expire_code_at: Option<chrono::NaiveDateTime>,
+}
+
+#[derive(sqlx::FromRow)]
+struct User2Point {
+    user_id: i64,
+    point_id: i64,
+}
+
+#[derive(sqlx::FromRow)]
+struct Point {
+    id: i64,
+    name: String,
+}
+
 pub async fn dump_users(
     take: i32,
     skip: i32,
     _swap: bool,
     pool: &SqlitePool,
 ) -> anyhow::Result<()> {
-    let users = sqlx::query!(
+    // , activateCodeAt, expireCodeAt
+    let users = sqlx::query_as!(
+        User,
         r#"
-select id, name, code, activateCodeAt, expireCodeAt
+select id, name, code, activateCodeAt as activate_code_at, expireCodeAt as expire_code_at
 from AccessUser order by id asc limit ? offset ?"#,
         take,
         skip
@@ -41,7 +64,7 @@ from AccessUser order by id asc limit ? offset ?"#,
     let user_ids: Vec<i64> = users.iter().map(|u| u.id).collect();
 
     let query = format!(
-        "select B, A from _AccessPointToAccessUser where B in ({})",
+        "select B as user_id, A as point_id from _AccessPointToAccessUser where B in ({})",
         user_ids
             .iter()
             .map(|_| "?")
@@ -49,20 +72,18 @@ from AccessUser order by id asc limit ? offset ?"#,
             .join(", ")
     );
 
-    let mut q = sqlx::query(&query);
+    let mut q = sqlx::query_as::<_, User2Point>(&query);
     for id in user_ids.iter() {
         q = q.bind(id);
     }
 
     let mut user2points = HashMap::<i64, Vec<i64>>::new();
     let mut rows = q.fetch(pool);
-    while let Some(row) = rows.try_next().await? {
-        let point_id: i64 = row.try_get("A")?;
-        let user_id: i64 = row.try_get("B")?;
-        if let Some(points) = user2points.get_mut(&user_id) {
-            points.push(point_id);
+    while let Some(u2p) = rows.try_next().await? {
+        if let Some(points) = user2points.get_mut(&u2p.user_id) {
+            points.push(u2p.point_id);
         } else {
-            user2points.insert(user_id, vec![point_id]);
+            user2points.insert(u2p.user_id, vec![u2p.point_id]);
         }
     }
     let point_ids: Vec<_> = user2points.values().flatten().copied().collect();
@@ -76,17 +97,17 @@ from AccessUser order by id asc limit ? offset ?"#,
             .join(", ")
     );
 
-    let mut q = sqlx::query(&query);
+    let mut q = sqlx::query_as::<_, Point>(&query);
     for id in point_ids.iter() {
         q = q.bind(id);
     }
 
     let mut points = HashMap::<i64, (i64, String)>::new();
     let mut rows = q.fetch(pool);
-    while let Some(row) = rows.try_next().await? {
-        let point_id: i64 = row.try_get("id")?;
-        let name: String = row.try_get("name")?;
-        points.insert(point_id, (point_id, name));
+    while let Some(p) = rows.try_next().await? {
+        // let point_id: i64 = row.try_get("id")?;
+        // let name: String = row.try_get("name")?;
+        points.insert(p.id, (p.id, p.name));
     }
 
     for u in &users {
@@ -98,7 +119,6 @@ from AccessUser order by id asc limit ? offset ?"#,
                     .iter()
                     .flat_map(|id| points.get(id))
                     .collect::<Vec<&(i64, String)>>()
-                    // .collect::<Vec<Option<&(i64, String)>>>()
             );
         }
     }
