@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use sqlx::{sqlite::SqlitePool};
+use sqlx::sqlite::SqlitePool;
 use std::env;
 
 mod dump;
@@ -86,18 +86,15 @@ async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
     let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
-    match &args.command {
-        Commands::Dump { command } => {
-            // println!("Dumping {:?}", command);
-            match command {
-                DumpCommands::Events { take, skip } => {
-                    dump::dump_events(*take, *skip, &pool).await?;
-                }
-                DumpCommands::Users { take, skip, swap } => {
-                    dump::dump_users(*take, *skip, *swap, &pool).await?;
-                }
+    match args.command {
+        Commands::Dump { command } => match command {
+            DumpCommands::Events { take, skip } => {
+                dump::dump_events(take, skip, &pool).await?;
             }
-        }
+            DumpCommands::Users { take, skip, swap } => {
+                dump::dump_users(take, skip, swap, &pool).await?;
+            }
+        },
         Commands::Mock { command } => {
             println!("Mocking {:?}", command);
         }
