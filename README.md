@@ -11,6 +11,12 @@
     ```
     export DATABASE_URL="sqlite://db/dev.db"
     ```
+- Launch config for debugging
+    ```
+    "env": {
+                "DATABASE_URL": "sqlite://db/dev.db",
+            }
+    ```
 
 - Cargo in root
     ```

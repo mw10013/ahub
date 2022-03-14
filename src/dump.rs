@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use futures::TryStreamExt;
 use sqlx::sqlite::SqlitePool;
+use std::collections::HashMap;
 
 pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
     let recs = sqlx::query!(
@@ -22,22 +21,24 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, sqlx::FromRow)]
+#[sqlx(rename_all = "camelCase")]
 struct User {
     id: i64,
     name: String,
     code: String,
     activate_code_at: Option<chrono::NaiveDateTime>,
     expire_code_at: Option<chrono::NaiveDateTime>,
+    // points: Vec<Point>,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(Debug, sqlx::FromRow)]
 struct User2Point {
     user_id: i64,
     point_id: i64,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(Debug, sqlx::FromRow)]
 struct Point {
     id: i64,
     name: String,
@@ -49,20 +50,27 @@ pub async fn dump_users(
     _swap: bool,
     pool: &SqlitePool,
 ) -> anyhow::Result<()> {
-    // , activateCodeAt, expireCodeAt
-    let users = sqlx::query_as!(
-        User,
+    //     let users = sqlx::query_as!(
+    //         User,
+    //         r#"
+    // select id, name, code, activateCodeAt as activate_code_at, expireCodeAt as expire_code_at
+    // from AccessUser order by id asc limit ? offset ?"#,
+    //         take,
+    //         skip
+    //     )
+    //     .fetch_all(pool)
+    //     .await?;
+    let users = sqlx::query_as::<_, User>(
         r#"
-select id, name, code, activateCodeAt as activate_code_at, expireCodeAt as expire_code_at
+select id, name, code, activateCodeAt, expireCodeAt
 from AccessUser order by id asc limit ? offset ?"#,
-        take,
-        skip
     )
+    .bind(take)
+    .bind(skip)
     .fetch_all(pool)
     .await?;
 
     let user_ids: Vec<i64> = users.iter().map(|u| u.id).collect();
-
     let query = format!(
         "select B as user_id, A as point_id from _AccessPointToAccessUser where B in ({})",
         user_ids
@@ -71,7 +79,6 @@ from AccessUser order by id asc limit ? offset ?"#,
             .collect::<Vec<&str>>()
             .join(", ")
     );
-
     let mut q = sqlx::query_as::<_, User2Point>(&query);
     for id in user_ids.iter() {
         q = q.bind(id);
@@ -96,17 +103,13 @@ from AccessUser order by id asc limit ? offset ?"#,
             .collect::<Vec<&str>>()
             .join(", ")
     );
-
     let mut q = sqlx::query_as::<_, Point>(&query);
     for id in point_ids.iter() {
         q = q.bind(id);
     }
-
     let mut points = HashMap::<i64, (i64, String)>::new();
     let mut rows = q.fetch(pool);
     while let Some(p) = rows.try_next().await? {
-        // let point_id: i64 = row.try_get("id")?;
-        // let name: String = row.try_get("name")?;
         points.insert(p.id, (p.id, p.name));
     }
 
