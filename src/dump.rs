@@ -22,9 +22,9 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
 }
 
 #[derive(Debug)]
-struct UserWithRelations<'a> {
+struct UserWithRelations<> {
     user: User,
-    points: Vec<&'a Point>,
+    points: Vec<Point>,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -43,7 +43,7 @@ struct User2Point {
     point_id: i64,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow)]
 struct Point {
     id: i64,
     name: String,
@@ -108,19 +108,6 @@ from AccessUser order by id asc limit ? offset ?"#,
         points.insert(p.id, p);
     }
 
-    // for u in &users {
-    //     println!("{:?}", *u);
-    //     if let Some(point_ids) = user2points.get(&u.id) {
-    //         println!(
-    //             "  points: {:?}",
-    //             point_ids
-    //                 .iter()
-    //                 .flat_map(|id| points.get(id))
-    //                 .collect::<Vec<&(i64, String)>>()
-    //         );
-    //     }
-    // }
-
     let users: Vec<UserWithRelations> = users
         .into_iter()
         .map(|u| {
@@ -132,7 +119,8 @@ from AccessUser order by id asc limit ? offset ?"#,
                     point_ids
                         .iter()
                         .flat_map(|id| points.get(id))
-                        .collect::<Vec<&Point>>(),
+                        .cloned()
+                        .collect(),
                 None =>
                     vec![]
             },
@@ -140,7 +128,7 @@ from AccessUser order by id asc limit ? offset ?"#,
         .collect();
 
     for u in &users {
-        println!("{:?}", u)
+        println!("{:?}\n", u)
     }
 
     Ok(())
