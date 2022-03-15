@@ -3,6 +3,7 @@ use sqlx::sqlite::SqlitePool;
 use std::env;
 
 mod dump;
+mod mock;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -63,17 +64,17 @@ enum MockCommands {
     Grant {
         /// Point id
         #[clap(short, long, parse(try_from_str))]
-        point: usize,
+        point: i64,
 
         /// User id
         #[clap(short, long, parse(try_from_str))]
-        user: usize,
+        user: i64,
     },
     /// Mock deny
     Deny {
         /// Point id
         #[clap(short, long, parse(try_from_str))]
-        point: usize,
+        point: i64,
 
         /// Code
         #[clap(short, long)]
@@ -95,9 +96,14 @@ async fn main() -> anyhow::Result<()> {
                 dump::dump_users(take, skip, swap, &pool).await?;
             }
         },
-        Commands::Mock { command } => {
-            println!("Mocking {:?}", command);
-        }
+        Commands::Mock { command } => match command {
+            MockCommands::Grant {point, user} => {
+                mock::grant(user, point, &pool).await?;
+            }
+            MockCommands::Deny {point, code} => {
+                mock::deny(point, code, &pool).await?;
+            }
+        },
         Commands::Heartbeat { host } => {
             println!("Heartbeat {:?}", host)
         }
