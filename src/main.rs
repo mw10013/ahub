@@ -5,6 +5,7 @@ use std::env;
 mod domain;
 mod dump;
 mod mock;
+mod heartbeat;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -106,7 +107,8 @@ async fn main() -> anyhow::Result<()> {
             }
         },
         Commands::Heartbeat { host } => {
-            println!("Heartbeat {:?}", host)
+            println!("Heartbeat {:?}", host);
+            heartbeat::heartbeat().await?
         }
     }
     Ok(())
