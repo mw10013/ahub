@@ -1,10 +1,8 @@
 use anyhow::Context;
 use sqlx::sqlite::SqlitePool;
-
-use crate::domain::User;
+use crate::domain::{User, Event};
 
 pub async fn grant(user_id: i64, point_id: i64, pool: &SqlitePool) -> anyhow::Result<()> {
-    println!("grant");
     /*
     CREATE TABLE IF NOT EXISTS "AccessEvent" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -27,9 +25,8 @@ pub async fn grant(user_id: i64, point_id: i64, pool: &SqlitePool) -> anyhow::Re
     BEGIN
     INSERT INTO AccessEvent (at, access, code, accessUserId, accessPointId) VALUES (?,?,?,?,?) RETURNING id
     Params: [2022-03-15 14:12:27.921 UTC,"grant","1111",1,1]
-    INSERT INTO AccessEvent (at, access, code, accessUserId, accessPointId) VALUES ("2022-03-15 14:12:27.921 UTC","grant","1111",1,1) RETURNING id;
+    INSERT INTO AccessEvent (at, access, code, accessUserId, accessPointId) VALUES (CURRENT_TIMESTAMP,"grant","1111",1,1) RETURNING id;
     INSERT INTO AccessEvent (at, access, code, accessUserId, accessPointId) VALUES (CURRENT_TIMESTAMP,"grant","1111",1,1);
-    INSERT INTO AccessEvent (at, access, code, accessUserId, accessPointId) VALUES (CURRENT_TIMESTAMP,"grant", select code from AccessUser where id = 1,1,1);
 
     SELECT id, at, access, code, accessUserId, accessPointId FROM AccessEvent WHERE id = ? LIMIT ? OFFSET ?
     Params: [3,1,0]
@@ -45,7 +42,6 @@ select id, name, code, activateCodeAt, expireCodeAt from AccessUser where id = ?
     .fetch_one(pool)
     .await
     .context("Access user does not exist")?;
-    println!("user: {:?}", user);
 
     let id = sqlx::query!(
         r#"
@@ -56,14 +52,10 @@ select id, name, code, activateCodeAt, expireCodeAt from AccessUser where id = ?
     .execute(pool)
     .await?
     .last_insert_rowid();
-    println!("id: {}", id);
-
-    Ok(())
+    print_event(id, pool).await
 }
 
 pub async fn deny(point_id: i64, code: String, pool: &SqlitePool) -> anyhow::Result<()> {
-    println!("deny");
-
     let id = sqlx::query!(
         r#"
         INSERT INTO AccessEvent (at, access, code, accessPointId) VALUES (CURRENT_TIMESTAMP,'deny', ?, ?)           
@@ -73,7 +65,18 @@ pub async fn deny(point_id: i64, code: String, pool: &SqlitePool) -> anyhow::Res
     .execute(pool)
     .await?
     .last_insert_rowid();
-    println!("id: {}", id);
+    print_event(id, pool).await
+}
 
+async fn print_event(id: i64, pool: &SqlitePool) -> anyhow::Result<()> {
+    let event = sqlx::query_as::<_, Event>(
+        r#"
+select id, at, access, code, accessUserId, accessPointId from AccessEvent where id = ?"#,
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await
+    .context("Event does not exist")?;
+    println!("{:?}", event);    
     Ok(())
 }
