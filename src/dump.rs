@@ -1,7 +1,6 @@
 use futures::TryStreamExt;
 use sqlx::sqlite::SqlitePool;
 use std::collections::HashMap;
-
 use crate::domain::{User, User2Point, Point, UserWithRelations};
 
 pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
@@ -22,7 +21,6 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
 
     Ok(())
 }
-
 
 pub async fn dump_users(
     take: i32,

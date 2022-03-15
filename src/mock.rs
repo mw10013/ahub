@@ -1,4 +1,7 @@
+use anyhow::Context;
 use sqlx::sqlite::SqlitePool;
+
+use crate::domain::User;
 
 pub async fn grant(user_id: i64, point_id: i64, pool: &SqlitePool) -> anyhow::Result<()> {
     println!("grant");
@@ -33,6 +36,27 @@ pub async fn grant(user_id: i64, point_id: i64, pool: &SqlitePool) -> anyhow::Re
     SELECT id, at, access, code, accessUserId, accessPointId FROM AccessEvent WHERE id = last_insert_rowid();
     COMMIT
      */
+
+    let user = sqlx::query_as::<_, User>(
+        r#"
+select id, name, code, activateCodeAt, expireCodeAt from AccessUser where id = ?"#,
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .context("Access user does not exist")?;
+    println!("user: {:?}", user);
+
+    let id = sqlx::query!(
+        r#"
+        INSERT INTO AccessEvent (at, access, code, accessUserId, accessPointId) VALUES (CURRENT_TIMESTAMP,'grant', ?, ?, ?)       
+        "#,
+        user.code, user_id, point_id
+    )
+    .execute(pool)
+    .await?
+    .last_insert_rowid();
+    println!("id: {}", id);
 
     Ok(())
 }
