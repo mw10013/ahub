@@ -21,6 +21,12 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     Ok(())
 }
 
+#[derive(Debug)]
+struct UserWithRelations<'a> {
+    user: User,
+    points: Vec<&'a Point>,
+}
+
 #[derive(Debug, sqlx::FromRow)]
 #[sqlx(rename_all = "camelCase")]
 struct User {
@@ -29,7 +35,6 @@ struct User {
     code: String,
     activate_code_at: Option<chrono::NaiveDateTime>,
     expire_code_at: Option<chrono::NaiveDateTime>,
-    // points: Vec<Point>,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -50,16 +55,6 @@ pub async fn dump_users(
     _swap: bool,
     pool: &SqlitePool,
 ) -> anyhow::Result<()> {
-    //     let users = sqlx::query_as!(
-    //         User,
-    //         r#"
-    // select id, name, code, activateCodeAt as activate_code_at, expireCodeAt as expire_code_at
-    // from AccessUser order by id asc limit ? offset ?"#,
-    //         take,
-    //         skip
-    //     )
-    //     .fetch_all(pool)
-    //     .await?;
     let users = sqlx::query_as::<_, User>(
         r#"
 select id, name, code, activateCodeAt, expireCodeAt
@@ -107,23 +102,45 @@ from AccessUser order by id asc limit ? offset ?"#,
     for id in point_ids.iter() {
         q = q.bind(id);
     }
-    let mut points = HashMap::<i64, (i64, String)>::new();
+    let mut points = HashMap::<i64, Point>::new();
     let mut rows = q.fetch(pool);
     while let Some(p) = rows.try_next().await? {
-        points.insert(p.id, (p.id, p.name));
+        points.insert(p.id, p);
     }
 
+    // for u in &users {
+    //     println!("{:?}", *u);
+    //     if let Some(point_ids) = user2points.get(&u.id) {
+    //         println!(
+    //             "  points: {:?}",
+    //             point_ids
+    //                 .iter()
+    //                 .flat_map(|id| points.get(id))
+    //                 .collect::<Vec<&(i64, String)>>()
+    //         );
+    //     }
+    // }
+
+    let users: Vec<UserWithRelations> = users
+        .into_iter()
+        .map(|u| {
+            let id = u.id;
+            UserWithRelations {
+            user: u,
+            points: match user2points.get(&id) {
+                Some(point_ids) =>
+                    point_ids
+                        .iter()
+                        .flat_map(|id| points.get(id))
+                        .collect::<Vec<&Point>>(),
+                None =>
+                    vec![]
+            },
+        }})
+        .collect();
+
     for u in &users {
-        println!("{:?}", *u);
-        if let Some(point_ids) = user2points.get(&u.id) {
-            println!(
-                "  points: {:?}",
-                point_ids
-                    .iter()
-                    .flat_map(|id| points.get(id))
-                    .collect::<Vec<&(i64, String)>>()
-            );
-        }
+        println!("{:?}", u)
     }
 
     Ok(())
