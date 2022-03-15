@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use sqlx::sqlite::SqlitePool;
 use std::env;
 
+mod domain;
 mod dump;
 mod mock;
 
@@ -97,10 +98,10 @@ async fn main() -> anyhow::Result<()> {
             }
         },
         Commands::Mock { command } => match command {
-            MockCommands::Grant {point, user} => {
+            MockCommands::Grant { point, user } => {
                 mock::grant(user, point, &pool).await?;
             }
-            MockCommands::Deny {point, code} => {
+            MockCommands::Deny { point, code } => {
                 mock::deny(point, code, &pool).await?;
             }
         },

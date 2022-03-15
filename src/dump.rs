@@ -2,6 +2,8 @@ use futures::TryStreamExt;
 use sqlx::sqlite::SqlitePool;
 use std::collections::HashMap;
 
+use crate::domain::{User, User2Point, Point, UserWithRelations};
+
 pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
     let recs = sqlx::query!(
         r#"
@@ -21,33 +23,6 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     Ok(())
 }
 
-#[derive(Debug)]
-struct UserWithRelations<> {
-    user: User,
-    points: Vec<Point>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-#[sqlx(rename_all = "camelCase")]
-struct User {
-    id: i64,
-    name: String,
-    code: String,
-    activate_code_at: Option<chrono::NaiveDateTime>,
-    expire_code_at: Option<chrono::NaiveDateTime>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct User2Point {
-    user_id: i64,
-    point_id: i64,
-}
-
-#[derive(Debug, Clone, sqlx::FromRow)]
-struct Point {
-    id: i64,
-    name: String,
-}
 
 pub async fn dump_users(
     take: i32,
