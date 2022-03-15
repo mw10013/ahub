@@ -63,5 +63,17 @@ select id, name, code, activateCodeAt, expireCodeAt from AccessUser where id = ?
 
 pub async fn deny(point_id: i64, code: String, pool: &SqlitePool) -> anyhow::Result<()> {
     println!("deny");
+
+    let id = sqlx::query!(
+        r#"
+        INSERT INTO AccessEvent (at, access, code, accessPointId) VALUES (CURRENT_TIMESTAMP,'deny', ?, ?)           
+        "#,
+        code, point_id
+    )
+    .execute(pool)
+    .await?
+    .last_insert_rowid();
+    println!("id: {}", id);
+
     Ok(())
 }

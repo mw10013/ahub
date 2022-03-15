@@ -26,3 +26,14 @@ pub struct Point {
     pub id: i64,
     pub name: String,
 }
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+#[sqlx(rename_all = "camelCase")]
+pub struct Event {
+    pub id: i64,
+    pub at: chrono::NaiveDateTime,
+    pub access: String,
+    pub code: String,
+    pub access_user_id: Option<i64>,
+    pub access_point_id: i64,
+}

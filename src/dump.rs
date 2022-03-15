@@ -1,22 +1,21 @@
+use crate::domain::{Event, Point, User, User2Point, UserWithRelations};
 use futures::TryStreamExt;
 use sqlx::sqlite::SqlitePool;
 use std::collections::HashMap;
-use crate::domain::{User, User2Point, Point, UserWithRelations};
 
 pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
-    let recs = sqlx::query!(
+    let events = sqlx::query_as::<_, Event>(
         r#"
-                SELECT id, at, access, code, accessUserId, accessPointId
-                FROM AccessEvent
-                ORDER BY at DESC LIMIT ? OFFSET ?"#,
-        take,
-        skip
+        select id, at, access, code, accessUserId, accessPointId from AccessEvent order by at desc limit ? offset ?
+        "#
     )
+    .bind(take)
+    .bind(skip)
     .fetch_all(pool)
     .await?;
 
-    for rec in recs {
-        println!("{:?}", rec);
+    for e in events {
+        println!("{:?}", e);
     }
 
     Ok(())
@@ -86,18 +85,17 @@ from AccessUser order by id asc limit ? offset ?"#,
         .map(|u| {
             let id = u.id;
             UserWithRelations {
-            user: u,
-            points: match user2points.get(&id) {
-                Some(point_ids) =>
-                    point_ids
+                user: u,
+                points: match user2points.get(&id) {
+                    Some(point_ids) => point_ids
                         .iter()
                         .flat_map(|id| points.get(id))
                         .cloned()
                         .collect(),
-                None =>
-                    vec![]
-            },
-        }})
+                    None => vec![],
+                },
+            }
+        })
         .collect();
 
     for u in &users {
