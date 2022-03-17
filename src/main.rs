@@ -108,8 +108,7 @@ async fn main() -> anyhow::Result<()> {
             }
         },
         Commands::Heartbeat { host } => {
-            println!("Heartbeat {:?}", host);
-            heartbeat::heartbeat().await?
+            heartbeat::heartbeat(host).await?
         }
     }
     Ok(())

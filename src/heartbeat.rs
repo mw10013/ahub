@@ -1,5 +1,4 @@
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
 // use anyhow::Context;
 // use sqlx::sqlite::SqlitePool;
 
@@ -18,7 +17,7 @@ struct HeartbeatAccessHubRequestData {
     id: i64,
 }
 
-pub async fn heartbeat() -> anyhow::Result<()> {
+pub async fn heartbeat(host: String) -> anyhow::Result<()> {
     /*
     let mut map = HashMap::new();
     map.insert("lang", "rust");
@@ -44,8 +43,7 @@ pub async fn heartbeat() -> anyhow::Result<()> {
     };
     let client = reqwest::Client::new();
     let res = client
-        // .post("http://localhost:3000/api/accesshub/heartbeat")
-        .post("http://172.26.0.1:3000/api/accesshub/heartbeat")
+        .post(format!("{}/api/accesshub/heartbeat", host))
         .json(&heartbeat_request_data)
         .send()
         .await?;
