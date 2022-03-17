@@ -18,6 +18,11 @@
             }
     ```
 
+- WSL - use nameserver ip to connect to Windows localhost. Must open port on Windows.
+    ```
+    cat /etc/resolv.conf
+    ```    
+
 - Cargo in root
     ```
     cargo run -- --help
