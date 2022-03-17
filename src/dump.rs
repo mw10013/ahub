@@ -15,7 +15,7 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     .await?;
 
     for e in events {
-        println!("{:?}", e);
+        println!("{:#?}", e);
     }
 
     Ok(())
@@ -99,7 +99,7 @@ from AccessUser order by id asc limit ? offset ?"#,
         .collect();
 
     for u in &users {
-        println!("{:?}\n", u)
+        println!("{:#?}\n", u)
     }
 
     Ok(())
