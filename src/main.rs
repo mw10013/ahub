@@ -84,7 +84,8 @@ enum MockCommands {
     },
 }
 
-#[async_std::main]
+// #[async_std::main]
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
     let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;

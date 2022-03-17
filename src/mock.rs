@@ -77,6 +77,6 @@ select id, at, access, code, accessUserId, accessPointId from AccessEvent where 
     .fetch_one(pool)
     .await
     .context("Event does not exist")?;
-    println!("{:?}", event);    
+    println!("{:#?}", event);    
     Ok(())
 }
