@@ -16,6 +16,11 @@ struct AccessHubRequestData {
     accessEvents: Vec<AccessEventRequestData>,
 }
 
+// toJSON(): '2022-03-18T18:00:53.188Z'
+// sqlite: 2022-03-15 22:17:57
+// NaiveDateTime: 2022-03-15T22:17:57
+// format("%Y-%m-%dT%H:%M:%S.000Z")
+
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 // #[sqlx(rename_all = "camelCase")]
 struct AccessEventRequestData {
@@ -45,11 +50,21 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         .await?;
     println!("{:#?}", hub);
 
-    let events: Vec<AccessEventRequestData> = sqlx::query_as("select at, access, code, accessUserId, accessPointId from AccessEvent order by at desc")
-        .fetch_all(pool)
-        .await?;
+    let events: Vec<AccessEventRequestData> = sqlx::query_as(
+        "select at, access, code, accessUserId, accessPointId from AccessEvent order by at desc",
+    )
+    .fetch_all(pool)
+    .await?;
 
-    dbg!(events);
+    dbg!(&events);
+
+    let e = &events[0];
+    println!(
+        "at: {} {} {}",
+        e.at,
+        e.at.format("%Y-%m-%d %H:%M:%S"),
+        e.at.format("%Y-%m-%dT%H:%M:%S.000Z")
+    );
 
     let request_data = RequestData {
         accessHub: AccessHubRequestData {
