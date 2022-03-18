@@ -8,19 +8,19 @@ struct Ip {
 }
 
 #[derive(Serialize, Deserialize)]
-struct HeartbeatRequestData {
-    accessHub: HeartbeatAccessHubRequestData,
+struct RequestData {
+    accessHub: AccessHubRequestData,
 }
 
 #[derive(Serialize, Deserialize)]
-struct HeartbeatAccessHubRequestData {
+struct AccessHubRequestData {
     id: i64,
     cloudLastAccessEventAt: Option<String>,
-    accessEvents: Vec<HeartbeatAccessEventRequestData>,
+    accessEvents: Vec<AccessEventRequestData>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct HeartbeatAccessEventRequestData {
+struct AccessEventRequestData {
     at: String,
     access: String,
     code: String,
@@ -29,6 +29,10 @@ struct HeartbeatAccessEventRequestData {
 }
 
 pub async fn heartbeat(host: String) -> anyhow::Result<()> {
+    // select strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+    // SELECT strftime('%s'); -- %s		seconds since 1970-01-01
+    // SELECT strftime('%f'); -- %s		seconds since 1970-01-01
+    // SELECT sqlite_version();
     /*
     let ip = reqwest::get("http://httpbin.org/ip")
         .await?
@@ -37,8 +41,8 @@ pub async fn heartbeat(host: String) -> anyhow::Result<()> {
     println!("ip: {}", ip.origin);
         */
 
-    let heartbeat_request_data = HeartbeatRequestData {
-        accessHub: HeartbeatAccessHubRequestData {
+    let request_data = RequestData {
+        accessHub: AccessHubRequestData {
             id: 1,
             cloudLastAccessEventAt: None,
             accessEvents: vec![],
@@ -47,16 +51,14 @@ pub async fn heartbeat(host: String) -> anyhow::Result<()> {
     let client = reqwest::Client::new();
     let res = client
         .post(format!("{}/api/accesshub/heartbeat", host))
-        .json(&heartbeat_request_data)
+        .json(&request_data)
         .send()
         .await?;
-    println!("{:#?}", res);
+    // println!("{:#?}", res);
 
     if res.status().is_success() {
-        // let json = res.json().await?;
-        // println!("json: {:#?}", json);
-        let text = res.text().await?;
-        println!("json: {}", text);
+        let json: serde_json::Value = res.json().await?;
+        println!("json: {:#?}", json);
     } else {
         let text = res.text().await?;
         println!("error: {}", text);
