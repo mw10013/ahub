@@ -58,6 +58,8 @@ enum DumpCommands {
         #[clap(short = 'w', long)]
         swap: bool,
     },
+    SqliteVersion {
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -97,6 +99,9 @@ async fn main() -> anyhow::Result<()> {
             }
             DumpCommands::Users { take, skip, swap } => {
                 dump::dump_users(take, skip, swap, &pool).await?;
+            }
+            DumpCommands::SqliteVersion {} => {
+                dump::dump_sqlite_version(&pool).await?;
             }
         },
         Commands::Mock { command } => match command {
