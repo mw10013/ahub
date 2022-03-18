@@ -9,12 +9,11 @@ edition = "2021"
 [dependencies]
 clap = {version="=3.1.6", features=["derive", "cargo"]}
 sqlx = { version = "=0.5.11", features = [ "macros", "migrate", "sqlite", "chrono", "runtime-async-std-native-tls" ] }
-chrono = "0.4"
+chrono = { version = "0.4", features =  [ "serde" ] }
 async-std = { version = "1.*", features = [ "attributes" ] }
 anyhow = "1.*"
 futures = "0.3"
-reqwest = { version = "0.11", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
-serde = "1.0"
-serde_derive = "1.0"
+reqwest = { version = "0.11", features = [ "json" ] }
+tokio = { version = "1", features = [ "full" ] }
+serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"

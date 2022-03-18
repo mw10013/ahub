@@ -1,7 +1,15 @@
-use crate::domain::{Event, Point, User, User2Point, UserWithRelations};
+use crate::domain::{Event, Hub, Point, User, User2Point, UserWithRelations};
 use futures::TryStreamExt;
 use sqlx::sqlite::SqlitePool;
 use std::collections::HashMap;
+
+pub async fn dump_hub(pool: &SqlitePool) -> anyhow::Result<()> {
+    let hub: Hub = sqlx::query_as("select id, name, cloudLastAccessEventAt from AccessHub")
+        .fetch_one(pool)
+        .await?;
+    println!("{:#?}", hub);
+    Ok(())
+}
 
 pub async fn dump_sqlite_version(pool: &SqlitePool) -> anyhow::Result<()> {
     let sqlite_version: (String,) = sqlx::query_as("select sqlite_version()")
@@ -70,7 +78,7 @@ from AccessUser order by id asc limit ? offset ?"#,
     let point_ids: Vec<_> = user2points.values().flatten().copied().collect();
 
     let query = format!(
-        "select id, name from AccessPoint where id in ({})",
+        "select id, name, position from AccessPoint where id in ({})",
         point_ids
             .iter()
             .map(|_| "?")

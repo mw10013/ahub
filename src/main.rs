@@ -4,8 +4,8 @@ use std::env;
 
 mod domain;
 mod dump;
-mod mock;
 mod heartbeat;
+mod mock;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -35,6 +35,8 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum DumpCommands {
+    /// Dump hub
+    Hub {},
     /// Dump events
     Events {
         /// Number of events to take
@@ -45,6 +47,7 @@ enum DumpCommands {
         #[clap(short, long, parse(try_from_str), default_value_t = 0)]
         skip: i32,
     },
+    /// Dump users
     Users {
         /// Number of users to take
         #[clap(short, long, parse(try_from_str), default_value_t = 50)]
@@ -58,8 +61,8 @@ enum DumpCommands {
         #[clap(short = 'w', long)]
         swap: bool,
     },
-    SqliteVersion {
-    }
+    /// Dump sqlite version
+    SqliteVersion {},
 }
 
 #[derive(Subcommand, Debug)]
@@ -94,6 +97,9 @@ async fn main() -> anyhow::Result<()> {
 
     match args.command {
         Commands::Dump { command } => match command {
+            DumpCommands::Hub {} => {
+                dump::dump_hub(&pool).await?;
+            }
             DumpCommands::Events { take, skip } => {
                 dump::dump_events(take, skip, &pool).await?;
             }
@@ -112,9 +118,7 @@ async fn main() -> anyhow::Result<()> {
                 mock::deny(point, code, &pool).await?;
             }
         },
-        Commands::Heartbeat { host } => {
-            heartbeat::heartbeat(host).await?
-        }
+        Commands::Heartbeat { host } => heartbeat::heartbeat(host, &pool).await?,
     }
     Ok(())
 }
