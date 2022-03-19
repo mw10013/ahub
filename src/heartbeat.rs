@@ -22,14 +22,43 @@ struct AccessHubRequestData {
 // format("%Y-%m-%dT%H:%M:%S.000Z")
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-// #[sqlx(rename_all = "camelCase")]
+#[sqlx(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 struct AccessEventRequestData {
     // at: String,
+    #[serde(with = "json_date_format")]
     at: chrono::NaiveDateTime,
     access: String,
     code: String,
-    accessUserId: Option<i64>,
-    accessPointId: i64,
+    access_user_id: Option<i64>,
+    access_point_id: i64,
+}
+
+mod json_date_format {
+    use chrono::NaiveDateTime;
+    use serde::{self, Deserialize, Deserializer, Serializer};
+
+    // const FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+    const FORMAT: &str = "%Y-%m-%dT%H:%M:%S.000Z";
+
+    pub fn serialize<S>(dt: &NaiveDateTime, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = format!("{}", dt.format(FORMAT));
+        println!("serialize: {} {}", dt, &s);
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        // Utc.datetime_from_str(&s, FORMAT).map_err(serde::de::Error::custom)
+        println!("deserialize: {}", &s);
+        NaiveDateTime::parse_from_str(&s, FORMAT).map_err(serde::de::Error::custom)
+    }
 }
 
 pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
@@ -59,12 +88,20 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     dbg!(&events);
 
     let e = &events[0];
-    println!(
-        "at: {} {} {}",
-        e.at,
-        e.at.format("%Y-%m-%d %H:%M:%S"),
-        e.at.format("%Y-%m-%dT%H:%M:%S.000Z")
-    );
+    println!("e: {:#?}", e);
+    // println!(
+    //     "at: {} {} {}",
+    //     e.at,
+    //     e.at.format("%Y-%m-%d %H:%M:%S"),
+    //     e.at.format("%Y-%m-%dT%H:%M:%S.000Z")
+    // );
+
+    let json = serde_json::to_string_pretty(&e).unwrap();
+    println!("json: {}", json);
+    let data: AccessEventRequestData = serde_json::from_str(&json).unwrap();
+    println!("data: {:#?}", data);
+    println!("data.at: {}", data.at);
+
 
     let request_data = RequestData {
         accessHub: AccessHubRequestData {
