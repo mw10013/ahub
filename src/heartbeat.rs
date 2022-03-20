@@ -1,3 +1,4 @@
+use chrono::Timelike;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::Hub;
@@ -43,7 +44,7 @@ struct AccessHubResponseData {
     id: i64,
     #[serde(with = "json_naive_date_time")]
     cloud_last_access_event_at: chrono::NaiveDateTime,
-    // access_users: Vec<AccessUserResponseData>,
+    access_users: Vec<AccessUserResponseData>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,26 +66,17 @@ struct AccessPointResponseData {
     name: String,
 }
 
-#[test]
-fn it_works() {
-    let parse = "2017-04-07T11:11:23.348Z".parse::<chrono::NaiveDateTime>();
-    println!("{:#?} {}", parse, parse.unwrap_err());
-    let parse = "2017-04-07T11:11:23.348Z".parse::<chrono::DateTime<chrono::Utc>>();
-    println!("{:#?}", parse);
-}
-
 // https://serde.rs/custom-date-format.html
 // JS Date.toJSON()
 mod json_naive_date_time {
-    use chrono::NaiveDateTime;
+    use chrono::{NaiveDateTime, Timelike};
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(dt: &NaiveDateTime, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let s = format!("{}", dt.format("%Y-%m-%dT%H:%M:%S%.3fZ"));
-        println!("serialize: {} {}", dt, &s);
+        let s = format!("{}", dt.format("%Y-%m-%dT%H:%M:%S%.3fZ")); // JS Date.toJSON()
         serializer.serialize_str(&s)
     }
 
@@ -93,23 +85,44 @@ mod json_naive_date_time {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        println!("deserialize: {}", &s);
-        NaiveDateTime::parse_from_str(&s, "%+").map_err(serde::de::Error::custom)
+        let dt = s
+            .parse::<chrono::DateTime<chrono::Utc>>()
+            .map_err(serde::de::Error::custom)?;
+        Ok(dt.naive_utc().with_nanosecond(0).unwrap())
+    }
+
+    #[test]
+    fn test_json_naive_date_time() {
+        #[derive(Debug, serde::Serialize, Deserialize)]
+        struct S {
+            #[serde(with = "self")]
+            dt: chrono::NaiveDateTime,
+        }
+        let dt = chrono::NaiveDate::from_ymd(2001, 9, 8).and_hms(1, 46, 40);
+        let data = S { dt };
+        let json = serde_json::to_string(&data).unwrap();
+        assert_eq!(json, r#"{"dt":"2001-09-08T01:46:40.000Z"}"#);
+
+        let data: S = serde_json::from_str(&json).unwrap();
+        assert_eq!(data.dt, dt);
+
+        let result = serde_json::from_str::<S>(r#"{"dt":"2001-09-08T01:46:40.000"}"#);
+        assert!(result.is_err());
     }
 }
 
 // https://stackoverflow.com/questions/44301748/how-can-i-deserialize-an-optional-field-with-custom-functions-using-serde
 // JS Date.toJSON()
 mod json_option_naive_date_time {
-    use chrono::NaiveDateTime;
-    use serde::{self, Deserialize, Deserializer, Serializer};
+    use chrono::{NaiveDateTime, Timelike};
+    use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S>(dt: &Option<NaiveDateTime>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         if let Some(ref d) = *dt {
-            return serializer.serialize_str(&d.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string());
+            return crate::heartbeat::json_naive_date_time::serialize(d, serializer);
         }
         serializer.serialize_none()
     }
@@ -120,11 +133,40 @@ mod json_option_naive_date_time {
     {
         let s: Option<String> = Option::deserialize(deserializer)?;
         if let Some(s) = s {
-            return Ok(Some(
-                NaiveDateTime::parse_from_str(&s, "%+").map_err(serde::de::Error::custom)?,
-            ));
+            let dt = s
+                .parse::<chrono::DateTime<chrono::Utc>>()
+                .map_err(serde::de::Error::custom)?;
+            return Ok(Some(dt.naive_utc().with_nanosecond(0).unwrap()));
         }
         Ok(None)
+    }
+
+    #[test]
+    fn test_json_option_naive_date_time() {
+        #[derive(Debug, Serialize, Deserialize)]
+        struct S {
+            #[serde(with = "self")]
+            opt_dt: Option<chrono::NaiveDateTime>,
+        }
+        let dt = chrono::NaiveDate::from_ymd(2001, 9, 8).and_hms(1, 46, 40);
+        let opt_dt = Some(dt);
+        let data = S { opt_dt };
+        let json = serde_json::to_string(&data).unwrap();
+        assert_eq!(json, r#"{"opt_dt":"2001-09-08T01:46:40.000Z"}"#);
+
+        let data: S = serde_json::from_str(&json).unwrap();
+        assert_eq!(data.opt_dt, opt_dt);
+
+        let opt_dt = None;
+        let data = S { opt_dt };
+        let json = serde_json::to_string(&data).unwrap();
+        assert_eq!(json, r#"{"opt_dt":null}"#);
+
+        let data: S = serde_json::from_str(&json).unwrap();
+        assert_eq!(data.opt_dt, opt_dt);
+
+        let result = serde_json::from_str::<S>(r#"{"opt_dt":"2001-09-08T01:46:40.000"}"#);
+        assert!(result.is_err());
     }
 }
 
@@ -154,7 +196,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         access_hub: AccessHubRequestData {
             id: hub.id,
             cloud_last_access_event_at: Some(
-                chrono::NaiveDate::from_ymd(2014, 5, 17).and_hms(7, 30, 22),
+                chrono::NaiveDate::from_ymd(2014, 5, 17).and_hms(7, 30, 23),
             ),
             // cloud_last_access_event_at: hub.cloud_last_access_event_at,
             access_events: events,
@@ -170,12 +212,8 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     // println!("{:#?}", res);
 
     if res.status().is_success() {
-        // let text = res.text().await?;
-        // println!("text: {}", &text);
-        // let data: ResponseData = serde_json::from_str(&text).unwrap();
-        // let data: serde_json::Value = res.json().await?;
         let data = res.json::<ResponseData>().await?;
-        println!("data: {:#?}", data);
+        println!("response data: {:#?}", data);
     } else {
         let text = res.text().await?;
         println!("error: {}", text);
