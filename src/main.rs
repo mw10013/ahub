@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use anyhow::Context;
 use sqlx::sqlite::SqlitePool;
 use std::env;
 
@@ -93,7 +94,7 @@ enum MockCommands {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
-    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+    let pool = SqlitePool::connect(&env::var("DATABASE_URL").context("DATABASE_URL not defined.")?).await?;
 
     match args.command {
         Commands::Dump { command } => match command {
