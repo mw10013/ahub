@@ -1,4 +1,4 @@
-use crate::domain::{Hub, Point, User};
+use crate::domain::{Hub, Point, User, User2Point};
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -64,6 +64,12 @@ struct AccessUserResponseData {
 struct AccessPointResponseData {
     id: i64,
     name: String,
+}
+
+#[derive(Debug, PartialEq)]
+struct UserWithPointIds {
+    user: User,
+    point_ids: Vec<i64>,
 }
 
 // https://serde.rs/custom-date-format.html
@@ -214,7 +220,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     }
 
     let data = res.json::<ResponseData>().await?;
-    // println!("response data: {:#?}", data);
+    println!("response data: {:#?}", data);
 
     if hub.cloud_last_access_event_at == None
         || hub.cloud_last_access_event_at.unwrap() != data.access_hub.cloud_last_access_event_at
@@ -233,14 +239,14 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         }
     }
 
-    let mut points = HashMap::<i64, Point>::new();
+    let mut local_points = HashMap::<i64, Point>::new();
     let mut rows = sqlx::query_as::<_, Point>(
         r#"select id, name, position from AccessPoint where accessHubId = ?"#,
     )
     .bind(hub.id)
     .fetch(pool);
     while let Some(u) = rows.try_next().await? {
-        points.insert(u.id, u);
+        local_points.insert(u.id, u);
     }
 
     let invalid_point_ids: HashSet<i64> = data
@@ -248,7 +254,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         .access_users
         .iter()
         .flat_map(|u| &u.access_points)
-        .filter(|p| !points.contains_key(&p.id))
+        .filter(|p| !local_points.contains_key(&p.id))
         .map(|p| p.id)
         .collect();
     if !invalid_point_ids.is_empty() {
@@ -258,16 +264,98 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         ));
     }
 
-    let mut users = HashMap::<i64, User>::new();
+    let mut user2points = HashMap::<i64, Vec<i64>>::new();
+    let mut rows = sqlx::query_as::<_, User2Point>(
+        r#"select B as user_id, A as point_id from _AccessPointToAccessUser"#,
+    )
+    .fetch(pool);
+    while let Some(u2p) = rows.try_next().await? {
+        if let Some(points) = user2points.get_mut(&u2p.user_id) {
+            points.push(u2p.point_id);
+        } else {
+            user2points.insert(u2p.user_id, vec![u2p.point_id]);
+        }
+    }
+
+    let mut local_users = HashMap::<i64, UserWithPointIds>::new();
     let mut rows = sqlx::query_as::<_, User>(
         r#"select id, name, code, activateCodeAt, expireCodeAt from AccessUser where accessHubId = ?"#,
     )
     .bind(hub.id)
     .fetch(pool);
     while let Some(u) = rows.try_next().await? {
-        users.insert(u.id, u);
+        let id = u.id;
+        local_users.insert(
+            id,
+            UserWithPointIds {
+                user: u,
+                point_ids: user2points.remove(&id).unwrap_or(vec![]),
+            }
+        );
     }
-    // dbg!(users);
+    dbg!(&local_users);
+
+    let mut cloud_users = HashMap::<i64, AccessUserResponseData>::new();
+    let mut common_ids = HashSet::<i64>::new();
+    for cloud_user in data.access_hub.access_users {
+        let cloud_user_id = cloud_user.id;
+        cloud_users.insert(cloud_user_id, cloud_user);
+        let cloud_user = cloud_users.get(&cloud_user_id).unwrap();
+        if let Some(local_user) = local_users.get(&cloud_user_id) {
+            common_ids.insert(cloud_user_id);
+            // #[derive(PartialEq)]
+            // struct S<'a> {
+            //     user: &'a User,
+            //     point_ids: &'a HashSet::<i64>,
+            // }
+            // let s = S {
+            //     user: local_user,
+            //     point_ids:
+            // }
+        }
+    }
+    // dbg!(&cloud_users);
+    // dbg!(&common_ids);
+
+    // println!("partialeq: {}", invalid_point_ids == common_ids);
 
     Ok(())
 }
+
+/*
+    const cloudAccessUserMap: AccessUserMap = new Map();
+    const createAccessUsers: AccessUser[] = [];
+    const updateAccessUsers: AccessUser[] = [];
+    const commondIdsSet = new Set();
+    const changedCodes = new Set();
+    for (const cloudAccessUser of parseResult.data.accessHub.accessUsers) {
+      cloudAccessUserMap.set(cloudAccessUser.id, cloudAccessUser);
+      const localAccessUser = localAccessUserMap.get(cloudAccessUser.id);
+      if (localAccessUser) {
+        commondIdsSet.add(cloudAccessUser.id);
+        if (
+          !_.isEqual(
+            {
+              ...cloudAccessUser,
+              accessPoints: new Set(
+                cloudAccessUser.accessPoints.map((v) => v.id)
+              ),
+            },
+            {
+              ...localAccessUser,
+              accessPoints: new Set(
+                localAccessUser.accessPoints.map((v) => v.id)
+              ),
+            }
+          )
+        ) {
+          updateAccessUsers.push(cloudAccessUser);
+          if (cloudAccessUser.code !== localAccessUser.code) {
+            changedCodes.add(cloudAccessUser.code);
+          }
+        }
+      } else {
+        createAccessUsers.push(cloudAccessUser);
+      }
+    }
+*/

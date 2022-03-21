@@ -13,7 +13,7 @@ pub struct HubWithRelations {
     pub users: Vec<UserWithRelations>,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(PartialEq, Debug, sqlx::FromRow)]
 #[sqlx(rename_all = "camelCase")]
 pub struct User {
     pub id: i64,
