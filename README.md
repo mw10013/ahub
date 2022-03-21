@@ -30,6 +30,8 @@
     cargo run dump sqlite-version   
     cargo run dump events
     cargo run dump users -t2
+    cargo run mock grant -u1 -p1
+    cargo run mock deny -p1 -c666
     cargo run heartbeat --host "http://$(hostname).local:3000"
     ```
 

@@ -1,7 +1,5 @@
-use chrono::Timelike;
-use serde::{Deserialize, Serialize};
-
 use crate::domain::Hub;
+use serde::{Deserialize, Serialize};
 // use anyhow::Context;
 use sqlx::sqlite::SqlitePool;
 
@@ -115,7 +113,7 @@ mod json_naive_date_time {
 // JS Date.toJSON()
 mod json_option_naive_date_time {
     use chrono::{NaiveDateTime, Timelike};
-    use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{self, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(dt: &Option<NaiveDateTime>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -143,7 +141,7 @@ mod json_option_naive_date_time {
 
     #[test]
     fn test_json_option_naive_date_time() {
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(serde::Serialize, Deserialize)]
         struct S {
             #[serde(with = "self")]
             opt_dt: Option<chrono::NaiveDateTime>,
@@ -176,7 +174,6 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         .await?;
     println!("{:#?}", hub);
 
-    // select * from AccessEvent where at > '2022-03-15 23:00:00' and at < DATETIME(CURRENT_TIMESTAMP, '-5 seconds') order by at desc;
     let events: Vec<AccessEventRequestData> = match hub.cloud_last_access_event_at {
         Some(cloud_last_access_event_at) => {
             // Leave margin to prevent race condition.
@@ -195,10 +192,10 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     let request_data = RequestData {
         access_hub: AccessHubRequestData {
             id: hub.id,
-            cloud_last_access_event_at: Some(
-                chrono::NaiveDate::from_ymd(2014, 5, 17).and_hms(7, 30, 23),
-            ),
-            // cloud_last_access_event_at: hub.cloud_last_access_event_at,
+            // cloud_last_access_event_at: Some(
+            //     chrono::NaiveDate::from_ymd(2014, 5, 17).and_hms(7, 30, 23),
+            // ),
+            cloud_last_access_event_at: hub.cloud_last_access_event_at,
             access_events: events,
         },
     };
@@ -209,14 +206,29 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         .json(&request_data)
         .send()
         .await?;
-    // println!("{:#?}", res);
 
-    if res.status().is_success() {
-        let data = res.json::<ResponseData>().await?;
-        println!("response data: {:#?}", data);
-    } else {
-        let text = res.text().await?;
-        println!("error: {}", text);
+    if !res.status().is_success() {
+        return Err(anyhow::anyhow!("Response error: {}", res.text().await?));
+    }
+
+    let data = res.json::<ResponseData>().await?;
+    println!("response data: {:#?}", data);
+
+    if hub.cloud_last_access_event_at == None
+        || hub.cloud_last_access_event_at.unwrap() != data.access_hub.cloud_last_access_event_at
+    {
+        let rows_affected =
+            sqlx::query(r#"update AccessHub set cloudLastAccessEventAt = ? where id = ?"#)
+                .bind(data.access_hub.cloud_last_access_event_at)
+                .bind(hub.id)
+                .execute(pool)
+                .await?
+                .rows_affected();
+        if rows_affected != 1 {
+            return Err(anyhow::anyhow!(
+                "Update cloud_last_access_event_at affected no rows"
+            ));
+        }
     }
 
     Ok(())
