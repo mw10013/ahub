@@ -1,5 +1,7 @@
-use crate::domain::Hub;
+use crate::domain::{Hub, Point, User};
+use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 // use anyhow::Context;
 use sqlx::sqlite::SqlitePool;
 
@@ -212,7 +214,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     }
 
     let data = res.json::<ResponseData>().await?;
-    println!("response data: {:#?}", data);
+    // println!("response data: {:#?}", data);
 
     if hub.cloud_last_access_event_at == None
         || hub.cloud_last_access_event_at.unwrap() != data.access_hub.cloud_last_access_event_at
@@ -230,6 +232,42 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             ));
         }
     }
+
+    let mut points = HashMap::<i64, Point>::new();
+    let mut rows = sqlx::query_as::<_, Point>(
+        r#"select id, name, position from AccessPoint where accessHubId = ?"#,
+    )
+    .bind(hub.id)
+    .fetch(pool);
+    while let Some(u) = rows.try_next().await? {
+        points.insert(u.id, u);
+    }
+
+    let invalid_point_ids: HashSet<i64> = data
+        .access_hub
+        .access_users
+        .iter()
+        .flat_map(|u| &u.access_points)
+        .filter(|p| !points.contains_key(&p.id))
+        .map(|p| p.id)
+        .collect();
+    if !invalid_point_ids.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Invalid point ids in server response: {:#?}",
+            invalid_point_ids
+        ));
+    }
+
+    let mut users = HashMap::<i64, User>::new();
+    let mut rows = sqlx::query_as::<_, User>(
+        r#"select id, name, code, activateCodeAt, expireCodeAt from AccessUser where accessHubId = ?"#,
+    )
+    .bind(hub.id)
+    .fetch(pool);
+    while let Some(u) = rows.try_next().await? {
+        users.insert(u.id, u);
+    }
+    // dbg!(users);
 
     Ok(())
 }
