@@ -1,7 +1,10 @@
 use crate::domain::{Hub, Point, User, User2Point};
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::RangeBounds,
+};
 // use anyhow::Context;
 use sqlx::sqlite::SqlitePool;
 
@@ -344,15 +347,19 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     dbg!(&update_users);
     dbg!(&changed_codes);
 
+    let delete_ids: HashSet<i64> = local_users
+        .keys()
+        .filter(|k| !common_ids.contains(k))
+        .copied()
+        .collect();
+    dbg!(&delete_ids);
+
+    let recycled_code_local_users: Vec<&UserWithPointIds> = update_users
+        .iter()
+        .flat_map(|x| local_users.get(&x.user.id))
+        .filter(|x| changed_codes.contains(&*x.user.code))
+        .collect();
+    dbg!(&recycled_code_local_users);
+
     Ok(())
 }
-
-/*
-const deleteIds = [...localAccessUserMap.keys()].filter(
-      (x) => !commondIdsSet.has(x)
-    );
-    const recycledCodeLocalAccessUsers = updateAccessUsers
-      .map((x) => localAccessUserMap.get(x.id))
-      .filter((x): x is AccessUser => x !== undefined)
-      .filter((x) => changedCodes.has(x.code));
-*/
