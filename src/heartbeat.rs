@@ -296,6 +296,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     dbg!(&local_users);
 
     let mut cloud_users = HashMap::<i64, UserWithPointIds>::new();
+    let cloud_users_len = data.access_hub.access_users.len();
     for cloud_user_data in data.access_hub.access_users {
         cloud_users.insert(
             cloud_user_data.id,
@@ -315,6 +316,11 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             },
         );
     }
+
+    if cloud_users.len() != cloud_users_len {
+        return Err(anyhow::anyhow!("Duplicate cloud access user id's"));
+    }
+
     let mut common_ids = HashSet::<i64>::new();
     let mut create_users = Vec::<&UserWithPointIds>::new();
     let mut update_users = Vec::<&UserWithPointIds>::new();
@@ -342,39 +348,11 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
 }
 
 /*
-    const cloudAccessUserMap: AccessUserMap = new Map();
-    const createAccessUsers: AccessUser[] = [];
-    const updateAccessUsers: AccessUser[] = [];
-    const commondIdsSet = new Set();
-    const changedCodes = new Set();
-    for (const cloudAccessUser of parseResult.data.accessHub.accessUsers) {
-      cloudAccessUserMap.set(cloudAccessUser.id, cloudAccessUser);
-      const localAccessUser = localAccessUserMap.get(cloudAccessUser.id);
-      if (localAccessUser) {
-        commondIdsSet.add(cloudAccessUser.id);
-        if (
-          !_.isEqual(
-            {
-              ...cloudAccessUser,
-              accessPoints: new Set(
-                cloudAccessUser.accessPoints.map((v) => v.id)
-              ),
-            },
-            {
-              ...localAccessUser,
-              accessPoints: new Set(
-                localAccessUser.accessPoints.map((v) => v.id)
-              ),
-            }
-          )
-        ) {
-          updateAccessUsers.push(cloudAccessUser);
-          if (cloudAccessUser.code !== localAccessUser.code) {
-            changedCodes.add(cloudAccessUser.code);
-          }
-        }
-      } else {
-        createAccessUsers.push(cloudAccessUser);
-      }
-    }
+const deleteIds = [...localAccessUserMap.keys()].filter(
+      (x) => !commondIdsSet.has(x)
+    );
+    const recycledCodeLocalAccessUsers = updateAccessUsers
+      .map((x) => localAccessUserMap.get(x.id))
+      .filter((x): x is AccessUser => x !== undefined)
+      .filter((x) => changedCodes.has(x.code));
 */
