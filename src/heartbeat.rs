@@ -361,5 +361,96 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         .collect();
     dbg!(&recycled_code_local_users);
 
+    // Access user codes must be unique: delete, update recyled codes, update, create.
+    // TODO: Transaction
+    if !delete_ids.is_empty() {
+        let query = format!(
+            "delete from AccessUser where id in ({})",
+            delete_ids
+                .iter()
+                .map(|_| "?")
+                .collect::<Vec<&str>>()
+                .join(", ")
+        );
+        let mut q = sqlx::query(&query);
+        for id in delete_ids.iter() {
+            q = q.bind(id);
+        }
+        let rows_affected = q.execute(pool).await?.rows_affected();
+        if rows_affected != 1 {
+            return Err(anyhow::anyhow!(
+                "Deleted rows affected mismatch. Expected {}. Received {}.",
+                delete_ids.len(),
+                rows_affected
+            ));
+        }
+    }
+
     Ok(())
 }
+
+/*
+// Access user codes must be unique: delete, update recyled codes, update, create.
+    
+      recycledCodeLocalAccessUsers.length === 0
+        ? null
+        : db.accessHub.update({
+            where: { id: accessHub.id },
+            data: {
+              accessUsers: {
+                update: recycledCodeLocalAccessUsers.map(({ id, code }) => ({
+                  where: { id },
+                  data: {
+                    code: `${code}-`, // TODO: Robust way to make code unique.
+                  },
+                })),
+              },
+            },
+          }),
+      updateAccessUsers.length === 0
+        ? null
+        : db.accessHub.update({
+            where: { id: accessHub.id },
+            data: {
+              accessUsers: {
+                update: updateAccessUsers.map(({ id, ...accessUser }) => ({
+                  where: { id },
+                  data: {
+                    ...accessUser,
+                    accessPoints: {
+                      set: accessUser.accessPoints.map((v) => ({ id: v.id })),
+                    },
+                  },
+                })),
+              },
+            },
+          }),
+      createAccessUsers.length === 0
+        ? null
+        : db.accessHub.update({
+            where: { id: accessHub.id },
+            data: {
+              accessUsers: {
+                create: createAccessUsers.map((accessUser) => ({
+                  ...accessUser,
+                  accessPoints: {
+                    connect: accessUser.accessPoints.map((v) => ({ id: v.id })),
+                  },
+                })),
+              },
+            },
+          }),
+      accessHub.cloudLastAccessEventAt &&
+      accessHub.cloudLastAccessEventAt.getTime() ===
+        parseResult.data.accessHub.cloudLastAccessEventAt.getTime()
+        ? null
+        : db.accessHub.update({
+            where: { id: accessHub.id },
+            data: {
+              cloudLastAccessEventAt:
+                parseResult.data.accessHub.cloudLastAccessEventAt,
+            },
+          }),
+    ].filter((x): x is TransactionParameter => x !== null);
+    await db.$transaction(transactionArray);
+*/
