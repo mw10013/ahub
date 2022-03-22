@@ -290,34 +290,53 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             UserWithPointIds {
                 user: u,
                 point_ids: user2points.remove(&id).unwrap_or(vec![]),
-            }
+            },
         );
     }
     dbg!(&local_users);
 
-    let mut cloud_users = HashMap::<i64, AccessUserResponseData>::new();
+    let mut cloud_users = HashMap::<i64, UserWithPointIds>::new();
+    for cloud_user_data in data.access_hub.access_users {
+        cloud_users.insert(
+            cloud_user_data.id,
+            UserWithPointIds {
+                user: User {
+                    id: cloud_user_data.id,
+                    name: cloud_user_data.name,
+                    code: cloud_user_data.code,
+                    activate_code_at: cloud_user_data.activate_code_at,
+                    expire_code_at: cloud_user_data.expire_code_at,
+                },
+                point_ids: cloud_user_data
+                    .access_points
+                    .iter()
+                    .map(|p| p.id)
+                    .collect::<Vec<i64>>(),
+            },
+        );
+    }
     let mut common_ids = HashSet::<i64>::new();
-    for cloud_user in data.access_hub.access_users {
-        let cloud_user_id = cloud_user.id;
-        cloud_users.insert(cloud_user_id, cloud_user);
-        let cloud_user = cloud_users.get(&cloud_user_id).unwrap();
-        if let Some(local_user) = local_users.get(&cloud_user_id) {
-            common_ids.insert(cloud_user_id);
-            // #[derive(PartialEq)]
-            // struct S<'a> {
-            //     user: &'a User,
-            //     point_ids: &'a HashSet::<i64>,
-            // }
-            // let s = S {
-            //     user: local_user,
-            //     point_ids:
-            // }
+    let mut create_users = Vec::<&UserWithPointIds>::new();
+    let mut update_users = Vec::<&UserWithPointIds>::new();
+    let mut changed_codes = HashSet::<&str>::new();
+    for cloud_user in cloud_users.values() {
+        if let Some(local_user) = local_users.get(&cloud_user.user.id) {
+            common_ids.insert(cloud_user.user.id);
+            if local_user != cloud_user {
+                update_users.push(cloud_user);
+                if local_user.user.code != cloud_user.user.code {
+                    changed_codes.insert(&cloud_user.user.code);
+                }
+            }
+        } else {
+            create_users.push(cloud_user);
         }
     }
-    // dbg!(&cloud_users);
-    // dbg!(&common_ids);
-
-    // println!("partialeq: {}", invalid_point_ids == common_ids);
+    dbg!(&cloud_users);
+    dbg!(&common_ids);
+    dbg!(&create_users);
+    dbg!(&update_users);
+    dbg!(&changed_codes);
 
     Ok(())
 }
