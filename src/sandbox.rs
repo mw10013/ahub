@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 #[test]
 fn test_it() {
     #[derive(Debug)]
+    #[allow(dead_code)]
     struct S {
         id: i64,
         name: String,
@@ -17,7 +16,7 @@ fn test_it() {
             name: "Fi".to_string(),
         },
     ];
-    let mut m = HashMap::<i64, S>::new();
+    let mut m = std::collections::HashMap::<i64, S>::new();
     let mut coll = Vec::<&S>::new();
     for d in data {
         m.insert(d.id, d);

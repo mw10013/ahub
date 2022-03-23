@@ -1,10 +1,7 @@
 use crate::domain::{Hub, Point, User, User2Point};
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    ops::RangeBounds,
-};
+use std::collections::{HashMap, HashSet};
 // use anyhow::Context;
 use sqlx::sqlite::SqlitePool;
 
@@ -66,6 +63,7 @@ struct AccessUserResponseData {
 #[derive(Debug, Deserialize)]
 struct AccessPointResponseData {
     id: i64,
+    #[allow(dead_code)]
     name: String,
 }
 
@@ -225,6 +223,14 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     let data = res.json::<ResponseData>().await?;
     println!("response data: {:#?}", data);
 
+    if hub.id != data.access_hub.id {
+        return Err(anyhow::anyhow!(
+            "Hub id {} does not match cloud hub id {}",
+            hub.id,
+            data.access_hub.id
+        ));
+    }
+
     if hub.cloud_last_access_event_at == None
         || hub.cloud_last_access_event_at.unwrap() != data.access_hub.cloud_last_access_event_at
     {
@@ -292,7 +298,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             id,
             UserWithPointIds {
                 user: u,
-                point_ids: user2points.remove(&id).unwrap_or(vec![]),
+                point_ids: user2points.remove(&id).unwrap_or_default(),
             },
         );
     }
@@ -379,10 +385,102 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         let rows_affected = q.execute(pool).await?.rows_affected();
         if rows_affected != 1 {
             return Err(anyhow::anyhow!(
-                "Deleted rows affected mismatch. Expected {}. Received {}.",
-                delete_ids.len(),
-                rows_affected
+                "Delete users affected {} rows instead of {}.",
+                rows_affected,
+                delete_ids.len()
             ));
+        }
+    }
+
+    /*
+        Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
+    Params: [1,1,-1,0]
+    Query: UPDATE `main`.`AccessUser` SET `code` = ? WHERE `main`.`AccessUser`.`id` IN (?)
+    Params: ["555-",1]
+     */
+    if !recycled_code_local_users.is_empty() {
+        // TODO: Robus way to make recycled code unique.
+        for u in recycled_code_local_users {
+            let rows_affected = sqlx::query(r#"update AccessUser set code = ? where id = ?"#)
+                .bind(format!("{}-", &u.user.code))
+                .bind(u.user.id)
+                .execute(pool)
+                .await?
+                .rows_affected();
+            if rows_affected != 1 {
+                return Err(anyhow::anyhow!(
+                    "Update user {} recyled code affected no rows",
+                    u.user.id
+                ));
+            }
+        }
+    }
+
+    /*
+    Query: UPDATE `main`.`AccessUser` SET `name` = ?, `code` = ?, `activateCodeAt` = ?, `expireCodeAt` = ? WHERE `main`.`AccessUser`.`id` IN (?)
+    Params: ["Master","444",null,null,1]
+    Query: SELECT `main`.`_AccessPointToAccessUser`.`B`, `main`.`_AccessPointToAccessUser`.`A` FROM `main`.`_AccessPointToAccessUser`
+    WHERE `main`.`_AccessPointToAccessUser`.`B` IN (?)
+    Params: [1]
+    Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (1=1 AND `main`.`AccessPoint`.`id` IN (?,?,?,?,?,?,?,?)) LIMIT ? OFFSET ?
+    Params: [1,2,3,4,5,6,7,8,-1,0]
+    Query: DELETE FROM `main`.`_AccessPointToAccessUser` WHERE (`main`.`_AccessPointToAccessUser`.`B` = (?) AND `main`.`_AccessPointToAccessUser`.`A` IN (?,?,?,?,?,?,?,?))
+    Params: [1,1,2,3,4,5,6,7,8]
+    Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (`main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ?) LIMIT ? OFFSET ?
+    Params: [1,2,3,4,5,6,7,8,-1,0]
+    Query: INSERT OR IGNORE INTO `main`.`_AccessPointToAccessUser` (`B`, `A`) VALUES (?,?), (?,?), (?,?), (?,?), (?,?), (?,?), (?,?),
+    (?,?)
+    Params: [1,1,1,2,1,3,1,4,1,5,1,6,1,7,1,8]
+    */
+
+    if !update_users.is_empty() {
+        for u in update_users {
+            let rows_affected = sqlx::query(
+                r#"update AccessUser set name=?, code=?, activateCodeAt=?, expireCodeAt=? where id=?"#)
+                .bind(&u.user.name)
+                .bind(&u.user.code)
+                .bind(u.user.activate_code_at)
+                .bind(u.user.expire_code_at)
+                .bind(u.user.id)
+                .execute(pool)
+                .await?
+                .rows_affected();
+            if rows_affected != 1 {
+                return Err(anyhow::anyhow!(
+                    "Update user {} affected no rows",
+                    u.user.id
+                ));
+            }
+            sqlx::query(r#"delete from _AccessPointToAccessUser where B=?"#)
+                .bind(u.user.id)
+                .execute(pool)
+                .await?;
+            if !u.point_ids.is_empty() {
+                // insert or ignore?
+                let query = format!(
+                    r#"insert into _AccessPointToAccessUser (B, A) values {}"#,
+                    u.point_ids
+                        .iter()
+                        .map(|_| "(?,?)")
+                        .collect::<Vec<&str>>()
+                        .join(",")
+                );
+                let mut q = sqlx::query(&query);
+                q = u
+                    .point_ids
+                    .iter()
+                    .fold(q, |q, id| q.bind(u.user.id).bind(id));
+
+                let rows_affected = q.execute(pool).await?.rows_affected();
+                if rows_affected as usize != u.point_ids.len() {
+                    return Err(anyhow::anyhow!(
+                        "Inserting user {} points affected {} rows instead of {}",
+                        u.user.id,
+                        rows_affected,
+                        u.point_ids.len()
+                    ));
+                }
+            }
         }
     }
 
@@ -391,7 +489,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
 
 /*
 // Access user codes must be unique: delete, update recyled codes, update, create.
-    
+
       recycledCodeLocalAccessUsers.length === 0
         ? null
         : db.accessHub.update({
@@ -453,4 +551,62 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
           }),
     ].filter((x): x is TransactionParameter => x !== null);
     await db.$transaction(transactionArray);
+*/
+
+/*
+Query: BEGIN
+Params: []
+Query: SELECT `main`.`AccessHub`.`id` FROM `main`.`AccessHub` WHERE `main`.`AccessHub`.`id` = ?
+Params: [1]
+
+Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
+Params: [1,1,-1,0]
+Query: UPDATE `main`.`AccessUser` SET `code` = ? WHERE `main`.`AccessUser`.`id` IN (?)
+Params: ["555-",1]
+
+Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
+Params: [6,1,-1,0]
+Query: UPDATE `main`.`AccessUser` SET `code` = ? WHERE `main`.`AccessUser`.`id` IN (?)
+Params: ["444-",6]
+
+Query: SELECT `main`.`AccessHub`.`id`, `main`.`AccessHub`.`name`, `main`.`AccessHub`.`cloudLastAccessEventAt` FROM `main`.`AccessHub` WHERE `main`.`AccessHub`.`id` = ? LIMIT ? OFFSET ?
+Params: [1,1,0]
+Query: SELECT `main`.`AccessHub`.`id` FROM `main`.`AccessHub` WHERE `main`.`AccessHub`.`id` = ?
+Params: [1]
+Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
+Params: [1,1,-1,0]
+Query: UPDATE `main`.`AccessUser` SET `name` = ?, `code` = ?, `activateCodeAt` = ?, `expireCodeAt` = ? WHERE `main`.`AccessUser`.`id` IN (?)
+Params: ["Master","444",null,null,1]
+Query: SELECT `main`.`_AccessPointToAccessUser`.`B`, `main`.`_AccessPointToAccessUser`.`A` FROM `main`.`_AccessPointToAccessUser`
+WHERE `main`.`_AccessPointToAccessUser`.`B` IN (?)
+Params: [1]
+Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (1=1 AND `main`.`AccessPoint`.`id` IN (?,?,?,?,?,?,?,?)) LIMIT ? OFFSET ?
+Params: [1,2,3,4,5,6,7,8,-1,0]
+Query: DELETE FROM `main`.`_AccessPointToAccessUser` WHERE (`main`.`_AccessPointToAccessUser`.`B` = (?) AND `main`.`_AccessPointToAccessUser`.`A` IN (?,?,?,?,?,?,?,?))
+Params: [1,1,2,3,4,5,6,7,8]
+Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (`main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ?) LIMIT ? OFFSET ?
+Params: [1,2,3,4,5,6,7,8,-1,0]
+Query: INSERT OR IGNORE INTO `main`.`_AccessPointToAccessUser` (`B`, `A`) VALUES (?,?), (?,?), (?,?), (?,?), (?,?), (?,?), (?,?),
+(?,?)
+Params: [1,1,1,2,1,3,1,4,1,5,1,6,1,7,1,8]
+
+Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
+Params: [6,1,-1,0]
+Query: UPDATE `main`.`AccessUser` SET `name` = ?, `code` = ?, `activateCodeAt` = ?, `expireCodeAt` = ? WHERE `main`.`AccessUser`.`id` IN (?)
+Params: ["Repair","555",null,null,6]
+Query: SELECT `main`.`_AccessPointToAccessUser`.`B`, `main`.`_AccessPointToAccessUser`.`A` FROM `main`.`_AccessPointToAccessUser`
+WHERE `main`.`_AccessPointToAccessUser`.`B` IN (?)
+Params: [6]
+Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (1=1 AND `main`.`AccessPoint`.`id` IN (?,?,?,?,?,?,?,?)) LIMIT ? OFFSET ?
+Params: [1,2,3,4,5,6,7,8,-1,0]
+Query: DELETE FROM `main`.`_AccessPointToAccessUser` WHERE (`main`.`_AccessPointToAccessUser`.`B` = (?) AND `main`.`_AccessPointToAccessUser`.`A` IN (?,?,?,?,?,?,?,?))
+Params: [6,1,2,3,4,5,6,7,8]
+Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (`main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ?) LIMIT ? OFFSET ?
+Params: [1,2,3,4,5,6,7,8,-1,0]
+Query: INSERT OR IGNORE INTO `main`.`_AccessPointToAccessUser` (`B`, `A`) VALUES (?,?), (?,?), (?,?), (?,?), (?,?), (?,?), (?,?),
+(?,?)
+Params: [6,1,6,2,6,3,6,4,6,5,6,6,6,7,6,8]
+Query: SELECT `main`.`AccessHub`.`id`, `main`.`AccessHub`.`name`, `main`.`AccessHub`.`cloudLastAccessEventAt` FROM `main`.`AccessHub` WHERE `main`.`AccessHub`.`id` = ? LIMIT ? OFFSET ?
+Params: [1,1,0]
+Query: COMMIT
 */
