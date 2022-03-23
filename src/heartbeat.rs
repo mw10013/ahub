@@ -307,6 +307,18 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     let mut cloud_users = HashMap::<i64, UserWithPointIds>::new();
     let cloud_users_len = data.access_hub.access_users.len();
     for cloud_user_data in data.access_hub.access_users {
+        if cloud_user_data.code.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Cloud user {} does not have code",
+                cloud_user_data.id
+            ));
+        }
+        if cloud_user_data.access_points.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Cloud user {} does not have any points",
+                cloud_user_data.id
+            ));
+        }
         cloud_users.insert(
             cloud_user_data.id,
             UserWithPointIds {
@@ -347,24 +359,25 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             create_users.push(cloud_user);
         }
     }
-    dbg!(&cloud_users);
-    dbg!(&common_ids);
-    dbg!(&create_users);
-    dbg!(&update_users);
-    dbg!(&changed_codes);
 
     let delete_ids: HashSet<i64> = local_users
         .keys()
         .filter(|k| !common_ids.contains(k))
         .copied()
         .collect();
-    dbg!(&delete_ids);
 
     let recycled_code_local_users: Vec<&UserWithPointIds> = update_users
         .iter()
         .flat_map(|x| local_users.get(&x.user.id))
         .filter(|x| changed_codes.contains(&*x.user.code))
         .collect();
+
+    dbg!(&cloud_users);
+    dbg!(&create_users);
+    dbg!(&update_users);
+    dbg!(&common_ids);
+    dbg!(&delete_ids);
+    dbg!(&changed_codes);
     dbg!(&recycled_code_local_users);
 
     // Access user codes must be unique: delete, update recyled codes, update, create.
@@ -392,12 +405,6 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         }
     }
 
-    /*
-        Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
-    Params: [1,1,-1,0]
-    Query: UPDATE `main`.`AccessUser` SET `code` = ? WHERE `main`.`AccessUser`.`id` IN (?)
-    Params: ["555-",1]
-     */
     if !recycled_code_local_users.is_empty() {
         // TODO: Robus way to make recycled code unique.
         for u in recycled_code_local_users {
@@ -415,23 +422,6 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             }
         }
     }
-
-    /*
-    Query: UPDATE `main`.`AccessUser` SET `name` = ?, `code` = ?, `activateCodeAt` = ?, `expireCodeAt` = ? WHERE `main`.`AccessUser`.`id` IN (?)
-    Params: ["Master","444",null,null,1]
-    Query: SELECT `main`.`_AccessPointToAccessUser`.`B`, `main`.`_AccessPointToAccessUser`.`A` FROM `main`.`_AccessPointToAccessUser`
-    WHERE `main`.`_AccessPointToAccessUser`.`B` IN (?)
-    Params: [1]
-    Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (1=1 AND `main`.`AccessPoint`.`id` IN (?,?,?,?,?,?,?,?)) LIMIT ? OFFSET ?
-    Params: [1,2,3,4,5,6,7,8,-1,0]
-    Query: DELETE FROM `main`.`_AccessPointToAccessUser` WHERE (`main`.`_AccessPointToAccessUser`.`B` = (?) AND `main`.`_AccessPointToAccessUser`.`A` IN (?,?,?,?,?,?,?,?))
-    Params: [1,1,2,3,4,5,6,7,8]
-    Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (`main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ?) LIMIT ? OFFSET ?
-    Params: [1,2,3,4,5,6,7,8,-1,0]
-    Query: INSERT OR IGNORE INTO `main`.`_AccessPointToAccessUser` (`B`, `A`) VALUES (?,?), (?,?), (?,?), (?,?), (?,?), (?,?), (?,?),
-    (?,?)
-    Params: [1,1,1,2,1,3,1,4,1,5,1,6,1,7,1,8]
-    */
 
     if !update_users.is_empty() {
         for u in update_users {
@@ -484,74 +474,48 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         }
     }
 
+    if !create_users.is_empty() {
+        for u in create_users {
+            let last_insert_rowid = sqlx::query(
+            r#"insert into AccessUser (id, name, code, activateCodeAt, expireCodeAt, accessHubId) values (?, ?, ?, ?, ?, ?)"#)
+                .bind(u.user.id)
+                .bind(&u.user.name)
+                .bind(&u.user.code)
+                .bind(u.user.activate_code_at)
+                .bind(u.user.expire_code_at)
+                .bind(hub.id)
+                .execute(pool)
+                .await?
+                .last_insert_rowid();
+
+            let query = format!(
+                r#"insert into _AccessPointToAccessUser (B, A) values {}"#,
+                u.point_ids
+                    .iter()
+                    .map(|_| "(?,?)")
+                    .collect::<Vec<&str>>()
+                    .join(",")
+            );
+            let mut q = sqlx::query(&query);
+            q = u
+                .point_ids
+                .iter()
+                .fold(q, |q, id| q.bind(last_insert_rowid).bind(id));
+
+            let rows_affected = q.execute(pool).await?.rows_affected();
+            if rows_affected as usize != u.point_ids.len() {
+                return Err(anyhow::anyhow!(
+                    "Inserting user {} points affected {} rows instead of {}",
+                    u.user.id,
+                    rows_affected,
+                    u.point_ids.len()
+                ));
+            }
+        }
+    }
+
     Ok(())
 }
-
-/*
-// Access user codes must be unique: delete, update recyled codes, update, create.
-
-      recycledCodeLocalAccessUsers.length === 0
-        ? null
-        : db.accessHub.update({
-            where: { id: accessHub.id },
-            data: {
-              accessUsers: {
-                update: recycledCodeLocalAccessUsers.map(({ id, code }) => ({
-                  where: { id },
-                  data: {
-                    code: `${code}-`, // TODO: Robust way to make code unique.
-                  },
-                })),
-              },
-            },
-          }),
-      updateAccessUsers.length === 0
-        ? null
-        : db.accessHub.update({
-            where: { id: accessHub.id },
-            data: {
-              accessUsers: {
-                update: updateAccessUsers.map(({ id, ...accessUser }) => ({
-                  where: { id },
-                  data: {
-                    ...accessUser,
-                    accessPoints: {
-                      set: accessUser.accessPoints.map((v) => ({ id: v.id })),
-                    },
-                  },
-                })),
-              },
-            },
-          }),
-      createAccessUsers.length === 0
-        ? null
-        : db.accessHub.update({
-            where: { id: accessHub.id },
-            data: {
-              accessUsers: {
-                create: createAccessUsers.map((accessUser) => ({
-                  ...accessUser,
-                  accessPoints: {
-                    connect: accessUser.accessPoints.map((v) => ({ id: v.id })),
-                  },
-                })),
-              },
-            },
-          }),
-      accessHub.cloudLastAccessEventAt &&
-      accessHub.cloudLastAccessEventAt.getTime() ===
-        parseResult.data.accessHub.cloudLastAccessEventAt.getTime()
-        ? null
-        : db.accessHub.update({
-            where: { id: accessHub.id },
-            data: {
-              cloudLastAccessEventAt:
-                parseResult.data.accessHub.cloudLastAccessEventAt,
-            },
-          }),
-    ].filter((x): x is TransactionParameter => x !== null);
-    await db.$transaction(transactionArray);
-*/
 
 /*
 Query: BEGIN
