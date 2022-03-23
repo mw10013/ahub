@@ -1,4 +1,6 @@
-use crate::domain::{Event, Hub, Point, User, User2Point, UserWithRelations};
+use crate::domain::{
+    Event, Hub, Point, Point2User, PointWithRelations, User, User2Point, UserWithRelations,
+};
 use futures::TryStreamExt;
 use sqlx::sqlite::SqlitePool;
 use std::collections::HashMap;
@@ -36,11 +38,7 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     Ok(())
 }
 
-pub async fn dump_users(
-    take: i32,
-    skip: i32,
-    pool: &SqlitePool,
-) -> anyhow::Result<()> {
+pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
     let users = sqlx::query_as::<_, User>(
         r#"
 select id, name, code, activateCodeAt, expireCodeAt
@@ -115,6 +113,84 @@ from AccessUser order by id asc limit ? offset ?"#,
     for u in &users {
         println!("{:#?}\n", u)
     }
+
+    Ok(())
+}
+
+pub async fn dump_points(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
+    let points = sqlx::query_as::<_, Point>(
+        r#"select id, name, position from AccessPOint order by position asc limit ? offset ?"#,
+    )
+    .bind(take)
+    .bind(skip)
+    .fetch_all(pool)
+    .await?;
+
+    let point_ids: Vec<i64> = points.iter().map(|p| p.id).collect();
+    let query = format!(
+        "select A as point_id, B as user_id from _AccessPointToAccessUser where A in ({})",
+        point_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<&str>>()
+            .join(",")
+    );
+    let mut q = sqlx::query_as::<_, Point2User>(&query);
+    for id in point_ids.iter() {
+        q = q.bind(id);
+    }
+
+    let mut point2users = HashMap::<i64, Vec<i64>>::new();
+    let mut rows = q.fetch(pool);
+    while let Some(p2u) = rows.try_next().await? {
+        if let Some(points) = point2users.get_mut(&p2u.user_id) {
+            points.push(p2u.point_id);
+        } else {
+            point2users.insert(p2u.user_id, vec![p2u.point_id]);
+        }
+    }
+    let point_ids: Vec<_> = point2users.values().flatten().copied().collect();
+
+    let query = format!(
+        "select id, name, code, activateCodeAt, expireCodeAt from AccessUser where id in ({})",
+        point_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<&str>>()
+            .join(", ")
+    );
+    let mut q = sqlx::query_as::<_, User>(&query);
+    for id in point_ids.iter() {
+        q = q.bind(id);
+    }
+    let mut users = HashMap::<i64, User>::new();
+    let mut rows = q.fetch(pool);
+    while let Some(u) = rows.try_next().await? {
+        users.insert(u.id, u);
+    }
+
+    let points: Vec<PointWithRelations> = points
+        .into_iter()
+        .map(|p| {
+            let id = p.id;
+            PointWithRelations {
+                point: p,
+                users: match point2users.get(&id) {
+                    Some(user_ids) => user_ids
+                        .iter()
+                        .flat_map(|id| users.get(id))
+                        .cloned()
+                        .collect(),
+                    None => vec![],
+                },
+            }
+        })
+        .collect();
+
+    // for u in &users {
+    //     println!("{:#?}\n", u)
+    // }
+    dbg!(&points);
 
     Ok(())
 }

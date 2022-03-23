@@ -39,13 +39,13 @@ enum Commands {
 enum DumpCommands {
     /// Dump hub
     Hub {},
-    /// Dump events
-    Events {
-        /// Number of events to take
-        #[clap(short, long, parse(try_from_str), default_value_t = 10)]
+    /// Dump points
+    Points {
+        /// Number of users to take
+        #[clap(short, long, parse(try_from_str), default_value_t = 50)]
         take: i32,
 
-        /// Number of events to skip
+        /// Number of users to skip
         #[clap(short, long, parse(try_from_str), default_value_t = 0)]
         skip: i32,
     },
@@ -56,6 +56,16 @@ enum DumpCommands {
         take: i32,
 
         /// Number of users to skip
+        #[clap(short, long, parse(try_from_str), default_value_t = 0)]
+        skip: i32,
+    },
+    /// Dump events
+    Events {
+        /// Number of events to take
+        #[clap(short, long, parse(try_from_str), default_value_t = 10)]
+        take: i32,
+
+        /// Number of events to skip
         #[clap(short, long, parse(try_from_str), default_value_t = 0)]
         skip: i32,
     },
@@ -86,7 +96,7 @@ enum MockCommands {
         code: String,
     },
     /// Swap codes of first two access users. Way to test recycled codes.
-    Swap {}
+    Swap {},
 }
 
 // #[async_std::main]
@@ -101,11 +111,14 @@ async fn main() -> anyhow::Result<()> {
             DumpCommands::Hub {} => {
                 dump::dump_hub(&pool).await?;
             }
-            DumpCommands::Events { take, skip } => {
-                dump::dump_events(take, skip, &pool).await?;
+            DumpCommands::Points { take, skip } => {
+                dump::dump_points(take, skip, &pool).await?;
             }
             DumpCommands::Users { take, skip } => {
                 dump::dump_users(take, skip, &pool).await?;
+            }
+            DumpCommands::Events { take, skip } => {
+                dump::dump_events(take, skip, &pool).await?;
             }
             DumpCommands::SqliteVersion {} => {
                 dump::dump_sqlite_version(&pool).await?;

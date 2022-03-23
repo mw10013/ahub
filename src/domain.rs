@@ -13,7 +13,26 @@ pub struct HubWithRelations {
     pub users: Vec<UserWithRelations>,
 }
 
-#[derive(PartialEq, Debug, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct Point {
+    pub id: i64,
+    pub name: String,
+    pub position: i64,
+}
+
+#[derive(Debug)]
+pub struct PointWithRelations {
+    pub point: Point,
+    pub users: Vec<User>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct Point2User {
+    pub point_id: i64,
+    pub user_id: i64,
+}
+
+#[derive(PartialEq, Clone, Debug, sqlx::FromRow)]
 #[sqlx(rename_all = "camelCase")]
 pub struct User {
     pub id: i64,
@@ -33,13 +52,6 @@ pub struct UserWithRelations {
 pub struct User2Point {
     pub user_id: i64,
     pub point_id: i64,
-}
-
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct Point {
-    pub id: i64,
-    pub name: String,
-    pub position: i64,
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
