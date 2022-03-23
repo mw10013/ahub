@@ -39,7 +39,6 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
 pub async fn dump_users(
     take: i32,
     skip: i32,
-    _swap: bool,
     pool: &SqlitePool,
 ) -> anyhow::Result<()> {
     let users = sqlx::query_as::<_, User>(

@@ -58,10 +58,6 @@ enum DumpCommands {
         /// Number of users to skip
         #[clap(short, long, parse(try_from_str), default_value_t = 0)]
         skip: i32,
-
-        /// Swap codes of first two access users
-        #[clap(short = 'w', long)]
-        swap: bool,
     },
     /// Dump sqlite version
     SqliteVersion {},
@@ -89,6 +85,8 @@ enum MockCommands {
         #[clap(short, long)]
         code: String,
     },
+    /// Swap codes of first two access users. Way to test recycled codes.
+    Swap {}
 }
 
 // #[async_std::main]
@@ -106,8 +104,8 @@ async fn main() -> anyhow::Result<()> {
             DumpCommands::Events { take, skip } => {
                 dump::dump_events(take, skip, &pool).await?;
             }
-            DumpCommands::Users { take, skip, swap } => {
-                dump::dump_users(take, skip, swap, &pool).await?;
+            DumpCommands::Users { take, skip } => {
+                dump::dump_users(take, skip, &pool).await?;
             }
             DumpCommands::SqliteVersion {} => {
                 dump::dump_sqlite_version(&pool).await?;
@@ -119,6 +117,9 @@ async fn main() -> anyhow::Result<()> {
             }
             MockCommands::Deny { point, code } => {
                 mock::deny(point, code, &pool).await?;
+            }
+            MockCommands::Swap {} => {
+                mock::swap(&pool).await?;
             }
         },
         Commands::Heartbeat { host } => heartbeat::heartbeat(host, &pool).await?,

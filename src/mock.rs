@@ -1,6 +1,6 @@
+use crate::domain::{Event, User};
 use anyhow::Context;
 use sqlx::sqlite::SqlitePool;
-use crate::domain::{User, Event};
 
 pub async fn grant(user_id: i64, point_id: i64, pool: &SqlitePool) -> anyhow::Result<()> {
     /*
@@ -68,6 +68,71 @@ pub async fn deny(point_id: i64, code: String, pool: &SqlitePool) -> anyhow::Res
     print_event(id, pool).await
 }
 
+pub async fn swap(pool: &SqlitePool) -> anyhow::Result<()> {
+    let users = sqlx::query_as::<_, User>(
+        r#"select id, name, code, activateCodeAt, expireCodeAt from AccessUser order by id asc limit ?"#,
+    )
+    .bind(2)
+    .fetch_all(pool)
+    .await?;
+
+    if let [u1, u2] = &users[..] {
+        let rows_affected = sqlx::query("update AccessUser set code=? where id=?")
+            .bind(format!("{}-", u1.code))
+            .bind(u1.id)
+            .execute(pool)
+            .await?
+            .rows_affected();
+        if rows_affected != 1 {
+            return Err(anyhow::anyhow!(
+                "Updating user {} code is {}",
+                u1.id,
+                rows_affected
+            ));
+        }
+
+        let rows_affected = sqlx::query("update AccessUser set code=? where id=?")
+            .bind(&u1.code)
+            .bind(u2.id)
+            .execute(pool)
+            .await?
+            .rows_affected();
+        if rows_affected != 1 {
+            return Err(anyhow::anyhow!(
+                "Updating user {} code is {}",
+                u2.id,
+                rows_affected
+            ));
+        }
+
+        let rows_affected = sqlx::query("update AccessUser set code=? where id=?")
+            .bind(&u2.code)
+            .bind(u1.id)
+            .execute(pool)
+            .await?
+            .rows_affected();
+        if rows_affected != 1 {
+            return Err(anyhow::anyhow!(
+                "Updating user {} code is {}",
+                u2.id,
+                rows_affected
+            ));
+        }
+    } else {
+        return Err(anyhow::anyhow!("No access users to swap."));
+    }
+
+    let users = sqlx::query_as::<_, User>(
+        r#"select id, name, code, activateCodeAt, expireCodeAt from AccessUser order by id asc limit ?"#,
+    )
+    .bind(2)
+    .fetch_all(pool)
+    .await?;
+    dbg!(&users);
+
+    Ok(())
+}
+
 async fn print_event(id: i64, pool: &SqlitePool) -> anyhow::Result<()> {
     let event = sqlx::query_as::<_, Event>(
         r#"
@@ -77,6 +142,6 @@ select id, at, access, code, accessUserId, accessPointId from AccessEvent where 
     .fetch_one(pool)
     .await
     .context("Event does not exist")?;
-    println!("{:#?}", event);    
+    println!("{:#?}", event);
     Ok(())
 }
