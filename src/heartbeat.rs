@@ -382,6 +382,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
 
     // Access user codes must be unique: delete, update recyled codes, update, create.
     // TODO: Transaction
+    let mut tx = pool.begin().await?;
     if !delete_ids.is_empty() {
         let query = format!(
             "delete from AccessUser where id in ({})",
@@ -395,8 +396,8 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         for id in delete_ids.iter() {
             q = q.bind(id);
         }
-        let rows_affected = q.execute(pool).await?.rows_affected();
-        if rows_affected != 1 {
+        let rows_affected = q.execute(&mut tx).await?.rows_affected();
+        if rows_affected as usize != delete_ids.len() {
             return Err(anyhow::anyhow!(
                 "Delete users affected {} rows instead of {}.",
                 rows_affected,
@@ -411,7 +412,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             let rows_affected = sqlx::query(r#"update AccessUser set code = ? where id = ?"#)
                 .bind(format!("{}-", &u.user.code))
                 .bind(u.user.id)
-                .execute(pool)
+                .execute(&mut tx)
                 .await?
                 .rows_affected();
             if rows_affected != 1 {
@@ -432,7 +433,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
                 .bind(u.user.activate_code_at)
                 .bind(u.user.expire_code_at)
                 .bind(u.user.id)
-                .execute(pool)
+                .execute(&mut tx)
                 .await?
                 .rows_affected();
             if rows_affected != 1 {
@@ -443,7 +444,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             }
             sqlx::query(r#"delete from _AccessPointToAccessUser where B=?"#)
                 .bind(u.user.id)
-                .execute(pool)
+                .execute(&mut tx)
                 .await?;
             if !u.point_ids.is_empty() {
                 // insert or ignore?
@@ -461,7 +462,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
                     .iter()
                     .fold(q, |q, id| q.bind(u.user.id).bind(id));
 
-                let rows_affected = q.execute(pool).await?.rows_affected();
+                let rows_affected = q.execute(&mut tx).await?.rows_affected();
                 if rows_affected as usize != u.point_ids.len() {
                     return Err(anyhow::anyhow!(
                         "Inserting user {} points affected {} rows instead of {}",
@@ -484,7 +485,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
                 .bind(u.user.activate_code_at)
                 .bind(u.user.expire_code_at)
                 .bind(hub.id)
-                .execute(pool)
+                .execute(&mut tx)
                 .await?
                 .last_insert_rowid();
 
@@ -502,7 +503,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
                 .iter()
                 .fold(q, |q, id| q.bind(last_insert_rowid).bind(id));
 
-            let rows_affected = q.execute(pool).await?.rows_affected();
+            let rows_affected = q.execute(&mut tx).await?.rows_affected();
             if rows_affected as usize != u.point_ids.len() {
                 return Err(anyhow::anyhow!(
                     "Inserting user {} points affected {} rows instead of {}",
@@ -513,6 +514,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             }
         }
     }
+    tx.commit().await?;
 
     Ok(())
 }
