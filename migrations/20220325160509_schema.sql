@@ -18,9 +18,9 @@ CREATE TABLE IF NOT EXISTS "AccessEvent" (
     "at" DATETIME NOT NULL,
     "access" TEXT NOT NULL,
     "code" TEXT NOT NULL,
-    "accessUserId" INTEGER,
-    "accessPointId" INTEGER NOT NULL,
-    CONSTRAINT "AccessEvent_accessPointId_fkey" FOREIGN KEY ("accessPointId") REFERENCES "AccessPoint" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "access_user_id" INTEGER,
+    "access_point_id" INTEGER NOT NULL,
+    CONSTRAINT "AccessEvent_access_point_id_fkey" FOREIGN KEY ("access_point_id") REFERENCES "AccessPoint" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 CREATE TABLE IF NOT EXISTS "_AccessPointToAccessUser" (
     "A" INTEGER NOT NULL,

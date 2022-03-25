@@ -52,7 +52,6 @@ pub struct User2Point {
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
-#[sqlx(rename_all = "camelCase")]
 pub struct Event {
     pub id: i64,
     pub at: chrono::NaiveDateTime,

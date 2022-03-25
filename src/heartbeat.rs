@@ -21,7 +21,6 @@ struct AccessHubRequestData {
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
-#[sqlx(rename_all = "camelCase")]
 #[serde(rename_all = "camelCase")]
 struct AccessEventRequestData {
     #[serde(with = "json_naive_date_time")]
@@ -185,7 +184,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         Some(cloud_last_access_event_at) => {
             // Leave margin to prevent race condition.
             sqlx::query_as(
-                "select at, access, code, accessUserId, accessPointId from AccessEvent 
+                "select at, access, code, access_user_id, access_point_id from AccessEvent 
                 where at > ? and at < DATETIME(CURRENT_TIMESTAMP, '-5 seconds') order by at desc",
             )
             .bind(cloud_last_access_event_at)

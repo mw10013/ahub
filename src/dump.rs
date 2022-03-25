@@ -24,7 +24,7 @@ pub async fn dump_sqlite_version(pool: &SqlitePool) -> anyhow::Result<()> {
 pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
     let events = sqlx::query_as::<_, Event>(
         r#"
-        select id, at, access, code, accessUserId, accessPointId from AccessEvent order by at desc limit ? offset ?
+        select id, at, access, code, access_user_id, access_point_id from AccessEvent order by at desc limit ? offset ?
         "#
     )
     .bind(take)
