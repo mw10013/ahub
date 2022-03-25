@@ -49,7 +49,7 @@ pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Resu
 
     let user_ids: Vec<i64> = users.iter().map(|u| u.id).collect();
     let query = format!(
-        "select B as user_id, A as point_id from _AccessPointToAccessUser where B in ({})",
+        "select B as user_id, A as point_id from AccessPointToAccessUser where B in ({})",
         user_ids
             .iter()
             .map(|_| "?")
@@ -126,7 +126,7 @@ pub async fn dump_points(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
 
     let point_ids: Vec<i64> = points.iter().map(|p| p.id).collect();
     let query = format!(
-        "select A as point_id, B as user_id from _AccessPointToAccessUser where A in ({})",
+        "select A as point_id, B as user_id from AccessPointToAccessUser where A in ({})",
         point_ids
             .iter()
             .map(|_| "?")
