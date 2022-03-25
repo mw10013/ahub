@@ -5,7 +5,7 @@ use sqlx::sqlite::SqlitePool;
 pub async fn grant(user_id: i64, point_id: i64, pool: &SqlitePool) -> anyhow::Result<()> {
     let user = sqlx::query_as::<_, User>(
         r#"
-select id, name, code, activateCodeAt, expireCodeAt from AccessUser where id = ?"#,
+select id, name, code, activate_code_at, expire_code_at from AccessUser where id = ?"#,
     )
     .bind(user_id)
     .fetch_one(pool)
@@ -39,7 +39,7 @@ pub async fn deny(point_id: i64, code: String, pool: &SqlitePool) -> anyhow::Res
 
 pub async fn swap(pool: &SqlitePool) -> anyhow::Result<()> {
     let users = sqlx::query_as::<_, User>(
-        r#"select id, name, code, activateCodeAt, expireCodeAt from AccessUser order by id asc limit ?"#,
+        r#"select id, name, code, activate_code_at, expire_code_at from AccessUser order by id asc limit ?"#,
     )
     .bind(2)
     .fetch_all(pool)
@@ -92,7 +92,7 @@ pub async fn swap(pool: &SqlitePool) -> anyhow::Result<()> {
     }
 
     let users = sqlx::query_as::<_, User>(
-        r#"select id, name, code, activateCodeAt, expireCodeAt from AccessUser order by id asc limit ?"#,
+        r#"select id, name, code, activate_code_at, expire_code_at from AccessUser order by id asc limit ?"#,
     )
     .bind(2)
     .fetch_all(pool)

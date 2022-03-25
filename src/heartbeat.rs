@@ -282,7 +282,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
 
     let mut local_users = HashMap::<i64, UserWithPointIds>::new();
     let mut rows = sqlx::query_as::<_, User>(
-        r#"select id, name, code, activateCodeAt, expireCodeAt from AccessUser"#,
+        r#"select id, name, code, activate_code_at, expire_code_at from AccessUser"#,
     )
     .fetch(pool);
     while let Some(u) = rows.try_next().await? {
@@ -420,7 +420,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     if !update_users.is_empty() {
         for u in update_users {
             let rows_affected = sqlx::query(
-                r#"update AccessUser set name=?, code=?, activateCodeAt=?, expireCodeAt=? where id=?"#)
+                r#"update AccessUser set name=?, code=?, activate_code_at=?, expire_code_at=? where id=?"#)
                 .bind(&u.user.name)
                 .bind(&u.user.code)
                 .bind(u.user.activate_code_at)
@@ -471,7 +471,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     if !create_users.is_empty() {
         for u in create_users {
             let last_insert_rowid = sqlx::query(
-            r#"insert into AccessUser (id, name, code, activateCodeAt, expireCodeAt) values (?, ?, ?, ?, ?)"#)
+            r#"insert into AccessUser (id, name, code, activate_code_at, expire_code_at) values (?, ?, ?, ?, ?)"#)
                 .bind(u.user.id)
                 .bind(&u.user.name)
                 .bind(&u.user.code)

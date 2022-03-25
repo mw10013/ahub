@@ -30,7 +30,6 @@ pub struct Point2User {
 }
 
 #[derive(PartialEq, Clone, Debug, sqlx::FromRow)]
-#[sqlx(rename_all = "camelCase")]
 pub struct User {
     pub id: i64,
     pub name: String,

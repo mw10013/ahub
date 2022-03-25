@@ -40,9 +40,7 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
 
 pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
     let users = sqlx::query_as::<_, User>(
-        r#"
-select id, name, code, activateCodeAt, expireCodeAt
-from AccessUser order by id asc limit ? offset ?"#,
+        r#"select id, name, code, activate_code_at, expire_code_at from AccessUser order by id asc limit ? offset ?"#,
     )
     .bind(take)
     .bind(skip)
@@ -152,7 +150,7 @@ pub async fn dump_points(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     let point_ids: Vec<_> = point2users.values().flatten().copied().collect();
 
     let query = format!(
-        "select id, name, code, activateCodeAt, expireCodeAt from AccessUser where id in ({})",
+        "select id, name, code, activate_code_at, expire_code_at from AccessUser where id in ({})",
         point_ids
             .iter()
             .map(|_| "?")

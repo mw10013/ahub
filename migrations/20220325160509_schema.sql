@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS "AccessUser" (
     "id" INTEGER NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL DEFAULT '',
     "code" TEXT NOT NULL,
-    "activateCodeAt" DATETIME,
-    "expireCodeAt" DATETIME
+    "activate_code_at" DATETIME,
+    "expire_code_at" DATETIME
 );
 CREATE TABLE IF NOT EXISTS "AccessEvent" (
     "id" INTEGER NOT NULL PRIMARY KEY,
