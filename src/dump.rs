@@ -1,5 +1,5 @@
 use crate::domain::{
-    Event, Hub, Point, Point2User, PointWithRelations, User, User2Point, UserWithRelations,
+    Event, Hub, Point, Point2User, PointWithRelations, User, UserWithRelations,
 };
 use futures::TryStreamExt;
 use sqlx::sqlite::SqlitePool;
@@ -56,7 +56,7 @@ pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Resu
             .collect::<Vec<&str>>()
             .join(", ")
     );
-    let mut q = sqlx::query_as::<_, User2Point>(&query);
+    let mut q = sqlx::query_as::<_, Point2User>(&query);
     for id in user_ids.iter() {
         q = q.bind(id);
     }

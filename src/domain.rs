@@ -44,12 +44,6 @@ pub struct UserWithRelations {
     pub points: Vec<Point>,
 }
 
-#[derive(Debug, sqlx::FromRow)]
-pub struct User2Point {
-    pub access_user_id: i64,
-    pub access_point_id: i64,
-}
-
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Event {
     pub id: i64,

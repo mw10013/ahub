@@ -1,4 +1,4 @@
-use crate::domain::{Hub, Point, User, User2Point};
+use crate::domain::{Hub, Point, User, Point2User};
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -268,7 +268,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     }
 
     let mut user2points = HashMap::<i64, Vec<i64>>::new();
-    let mut rows = sqlx::query_as::<_, User2Point>(
+    let mut rows = sqlx::query_as::<_, Point2User>(
         r#"select access_user_id, access_point_id from AccessPointToAccessUser"#,
     )
     .fetch(pool);
