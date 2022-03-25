@@ -250,9 +250,8 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
 
     let mut local_points = HashMap::<i64, Point>::new();
     let mut rows = sqlx::query_as::<_, Point>(
-        r#"select id, name, position from AccessPoint where accessHubId = ?"#,
+        r#"select id, position from AccessPoint"#,
     )
-    .bind(hub.id)
     .fetch(pool);
     while let Some(u) = rows.try_next().await? {
         local_points.insert(u.id, u);
@@ -518,61 +517,3 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
 
     Ok(())
 }
-
-/*
-Query: BEGIN
-Params: []
-Query: SELECT `main`.`AccessHub`.`id` FROM `main`.`AccessHub` WHERE `main`.`AccessHub`.`id` = ?
-Params: [1]
-
-Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
-Params: [1,1,-1,0]
-Query: UPDATE `main`.`AccessUser` SET `code` = ? WHERE `main`.`AccessUser`.`id` IN (?)
-Params: ["555-",1]
-
-Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
-Params: [6,1,-1,0]
-Query: UPDATE `main`.`AccessUser` SET `code` = ? WHERE `main`.`AccessUser`.`id` IN (?)
-Params: ["444-",6]
-
-Query: SELECT `main`.`AccessHub`.`id`, `main`.`AccessHub`.`name`, `main`.`AccessHub`.`cloudLastAccessEventAt` FROM `main`.`AccessHub` WHERE `main`.`AccessHub`.`id` = ? LIMIT ? OFFSET ?
-Params: [1,1,0]
-Query: SELECT `main`.`AccessHub`.`id` FROM `main`.`AccessHub` WHERE `main`.`AccessHub`.`id` = ?
-Params: [1]
-Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
-Params: [1,1,-1,0]
-Query: UPDATE `main`.`AccessUser` SET `name` = ?, `code` = ?, `activateCodeAt` = ?, `expireCodeAt` = ? WHERE `main`.`AccessUser`.`id` IN (?)
-Params: ["Master","444",null,null,1]
-Query: SELECT `main`.`_AccessPointToAccessUser`.`B`, `main`.`_AccessPointToAccessUser`.`A` FROM `main`.`_AccessPointToAccessUser`
-WHERE `main`.`_AccessPointToAccessUser`.`B` IN (?)
-Params: [1]
-Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (1=1 AND `main`.`AccessPoint`.`id` IN (?,?,?,?,?,?,?,?)) LIMIT ? OFFSET ?
-Params: [1,2,3,4,5,6,7,8,-1,0]
-Query: DELETE FROM `main`.`_AccessPointToAccessUser` WHERE (`main`.`_AccessPointToAccessUser`.`B` = (?) AND `main`.`_AccessPointToAccessUser`.`A` IN (?,?,?,?,?,?,?,?))
-Params: [1,1,2,3,4,5,6,7,8]
-Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (`main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ?) LIMIT ? OFFSET ?
-Params: [1,2,3,4,5,6,7,8,-1,0]
-Query: INSERT OR IGNORE INTO `main`.`_AccessPointToAccessUser` (`B`, `A`) VALUES (?,?), (?,?), (?,?), (?,?), (?,?), (?,?), (?,?),
-(?,?)
-Params: [1,1,1,2,1,3,1,4,1,5,1,6,1,7,1,8]
-
-Query: SELECT `main`.`AccessUser`.`id`, `main`.`AccessUser`.`accessHubId` FROM `main`.`AccessUser` WHERE (`main`.`AccessUser`.`id` = ? AND `main`.`AccessUser`.`accessHubId` IN (?)) LIMIT ? OFFSET ?
-Params: [6,1,-1,0]
-Query: UPDATE `main`.`AccessUser` SET `name` = ?, `code` = ?, `activateCodeAt` = ?, `expireCodeAt` = ? WHERE `main`.`AccessUser`.`id` IN (?)
-Params: ["Repair","555",null,null,6]
-Query: SELECT `main`.`_AccessPointToAccessUser`.`B`, `main`.`_AccessPointToAccessUser`.`A` FROM `main`.`_AccessPointToAccessUser`
-WHERE `main`.`_AccessPointToAccessUser`.`B` IN (?)
-Params: [6]
-Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (1=1 AND `main`.`AccessPoint`.`id` IN (?,?,?,?,?,?,?,?)) LIMIT ? OFFSET ?
-Params: [1,2,3,4,5,6,7,8,-1,0]
-Query: DELETE FROM `main`.`_AccessPointToAccessUser` WHERE (`main`.`_AccessPointToAccessUser`.`B` = (?) AND `main`.`_AccessPointToAccessUser`.`A` IN (?,?,?,?,?,?,?,?))
-Params: [6,1,2,3,4,5,6,7,8]
-Query: SELECT `main`.`AccessPoint`.`id` FROM `main`.`AccessPoint` WHERE (`main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ? OR `main`.`AccessPoint`.`id` = ?) LIMIT ? OFFSET ?
-Params: [1,2,3,4,5,6,7,8,-1,0]
-Query: INSERT OR IGNORE INTO `main`.`_AccessPointToAccessUser` (`B`, `A`) VALUES (?,?), (?,?), (?,?), (?,?), (?,?), (?,?), (?,?),
-(?,?)
-Params: [6,1,6,2,6,3,6,4,6,5,6,6,6,7,6,8]
-Query: SELECT `main`.`AccessHub`.`id`, `main`.`AccessHub`.`name`, `main`.`AccessHub`.`cloudLastAccessEventAt` FROM `main`.`AccessHub` WHERE `main`.`AccessHub`.`id` = ? LIMIT ? OFFSET ?
-Params: [1,1,0]
-Query: COMMIT
-*/

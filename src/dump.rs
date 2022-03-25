@@ -75,7 +75,7 @@ from AccessUser order by id asc limit ? offset ?"#,
     let point_ids: Vec<_> = user2points.values().flatten().copied().collect();
 
     let query = format!(
-        "select id, name, position from AccessPoint where id in ({})",
+        "select id, position from AccessPoint where id in ({})",
         point_ids
             .iter()
             .map(|_| "?")
@@ -119,7 +119,7 @@ from AccessUser order by id asc limit ? offset ?"#,
 
 pub async fn dump_points(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
     let points = sqlx::query_as::<_, Point>(
-        r#"select id, name, position from AccessPOint order by position asc limit ? offset ?"#,
+        r#"select id, position from AccessPOint order by position asc limit ? offset ?"#,
     )
     .bind(take)
     .bind(skip)

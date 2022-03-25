@@ -5,10 +5,7 @@ CREATE TABLE IF NOT EXISTS "AccessHub" (
 );
 CREATE TABLE IF NOT EXISTS "AccessPoint" (
     "id" INTEGER NOT NULL PRIMARY KEY,
-    "name" TEXT NOT NULL DEFAULT '',
-    "accessHubId" INTEGER NOT NULL,
-    "position" INTEGER NOT NULL,
-    CONSTRAINT "AccessPoint_accessHubId_fkey" FOREIGN KEY ("accessHubId") REFERENCES "AccessHub" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "position" INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS "AccessUser" (
     "id" INTEGER NOT NULL PRIMARY KEY,
@@ -34,7 +31,7 @@ CREATE TABLE IF NOT EXISTS "_AccessPointToAccessUser" (
     FOREIGN KEY ("A") REFERENCES "AccessPoint" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY ("B") REFERENCES "AccessUser" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX "AccessPoint_accessHubId_position_key" ON "AccessPoint"("accessHubId", "position");
+CREATE UNIQUE INDEX "AccessPoint_position_key" ON "AccessPoint"("position");
 CREATE UNIQUE INDEX "AccessUser_code_key" ON "AccessUser"("code");
 CREATE UNIQUE INDEX "_AccessPointToAccessUser_AB_unique" ON "_AccessPointToAccessUser"("A", "B");
 CREATE INDEX "_AccessPointToAccessUser_B_index" ON "_AccessPointToAccessUser"("B");

@@ -16,7 +16,6 @@ pub struct HubWithRelations {
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Point {
     pub id: i64,
-    pub name: String,
     pub position: i64,
 }
 
