@@ -249,10 +249,8 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     }
 
     let mut local_points = HashMap::<i64, Point>::new();
-    let mut rows = sqlx::query_as::<_, Point>(
-        r#"select id, position from AccessPoint"#,
-    )
-    .fetch(pool);
+    let mut rows =
+        sqlx::query_as::<_, Point>(r#"select id, position from AccessPoint"#).fetch(pool);
     while let Some(u) = rows.try_next().await? {
         local_points.insert(u.id, u);
     }
@@ -287,9 +285,8 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
 
     let mut local_users = HashMap::<i64, UserWithPointIds>::new();
     let mut rows = sqlx::query_as::<_, User>(
-        r#"select id, name, code, activateCodeAt, expireCodeAt from AccessUser where accessHubId = ?"#,
+        r#"select id, name, code, activateCodeAt, expireCodeAt from AccessUser"#,
     )
-    .bind(hub.id)
     .fetch(pool);
     while let Some(u) = rows.try_next().await? {
         let id = u.id;
@@ -477,13 +474,12 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     if !create_users.is_empty() {
         for u in create_users {
             let last_insert_rowid = sqlx::query(
-            r#"insert into AccessUser (id, name, code, activateCodeAt, expireCodeAt, accessHubId) values (?, ?, ?, ?, ?, ?)"#)
+            r#"insert into AccessUser (id, name, code, activateCodeAt, expireCodeAt) values (?, ?, ?, ?, ?)"#)
                 .bind(u.user.id)
                 .bind(&u.user.name)
                 .bind(&u.user.code)
                 .bind(u.user.activate_code_at)
                 .bind(u.user.expire_code_at)
-                .bind(hub.id)
                 .execute(&mut tx)
                 .await?
                 .last_insert_rowid();

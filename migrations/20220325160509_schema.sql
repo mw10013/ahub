@@ -11,9 +11,7 @@ CREATE TABLE IF NOT EXISTS "AccessUser" (
     "name" TEXT NOT NULL DEFAULT '',
     "code" TEXT NOT NULL,
     "activateCodeAt" DATETIME,
-    "expireCodeAt" DATETIME,
-    "accessHubId" INTEGER NOT NULL,
-    CONSTRAINT "AccessUser_accessHubId_fkey" FOREIGN KEY ("accessHubId") REFERENCES "AccessHub" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "expireCodeAt" DATETIME
 );
 CREATE TABLE IF NOT EXISTS "AccessEvent" (
     "id" INTEGER NOT NULL PRIMARY KEY,
