@@ -1,39 +1,158 @@
-# ahub - Access Hub CLI
+# ahub
+
+Access hub command-line utility.
 
 ## Setup
 
-- Create .env in root and put DATABASE_URL in it for rust-analyzer.
-    ```
-    DATABASE_URL="sqlite://db/dev.db"
-    ```
+### Create .env in root and put DATABASE_URL in it for rust-analyzer.
+```bash
+DATABASE_URL="sqlite://db/dev.db"
+```
 
-- Declare DATABASE_URL for cargo (relative path)
-    ```
-    export DATABASE_URL="sqlite://db/dev.db"
-    ```
-- Launch config for debugging
-    ```
-    "env": {
-                "DATABASE_URL": "sqlite://db/dev.db",
-            }
-    ```
+###  Declare DATABASE_URL for cargo (relative path)
+```bash
+export DATABASE_URL="sqlite://db/dev.db"
+```
 
-- WSL - use "$(hostname).local" or nameserver ip to connect to Windows localhost. Must open port on Windows.
-    ```
-    echo "$(hostname).local"
-    cat /etc/resolv.conf
-    ```    
+###  Launch config for debugging
+```json
+"env": {
+    "DATABASE_URL": "sqlite://db/dev.db",
+}
+```
 
-- Cargo in root
-    ```
-    cargo run -- --help
-    cargo run dump sqlite-version   
-    cargo run dump events
-    cargo run dump users -t2
-    cargo run mock grant -u1 -p1
-    cargo run mock deny -p1 -c666
-    cargo run heartbeat --host "http://$(hostname).local:3000"
-    ```
+### WSL
+Use "$(hostname).local" or nameserver ip to connect to Windows localhost. Must open port on Windows.
+```bash
+echo "$(hostname).local"
+cat /etc/resolv.conf
+```    
+
+## Cargo in root
+```bash
+cargo run -- --help
+cargo run dump sqlite-version   
+cargo run dump events
+cargo run dump users -t2
+cargo run mock grant -u1 -p1
+cargo run mock deny -p1 -c666
+cargo run heartbeat --host "http://$(hostname).local:3000"
+```
+
+## Sqlx CLI run using cargo
+All commands require that a database url is provided. This can be done either with the `--database-url` command line option or by setting `DATABASE_URL`, either in the environment or in a `.env` file
+in the current working directory.
+
+For more details, run `cargo sqlx <command> --help`.
+
+```dotenv
+# Postgres
+DATABASE_URL=postgres://postgres@localhost/my_database
+```
+
+#### Create/drop the database at `DATABASE_URL`
+
+```bash
+cargo sqlx database create
+cargo sqlx database drop
+```
+
+#### Create and run migrations
+
+```bash
+$ cargo sqlx migrate add <name>
+```
+Creates a new file in `migrations/<timestamp>-<name>.sql`. Add your database schema changes to
+this new file.
+
+---
+```bash
+$ cargo sqlx migrate run
+```
+Compares the migration history of the running database against the `migrations/` folder and runs
+any scripts that are still pending.
+
+#### Reverting Migrations
+
+If you would like to create _reversible_ migrations with corresponding "up" and "down" scripts, you use the `-r` flag when creating new migrations:
+
+```bash
+$ cargo sqlx migrate add -r <name>
+Creating migrations/20211001154420_<name>.up.sql
+Creating migrations/20211001154420_<name>.down.sql
+```
+
+After that, you can run these as above:
+
+```bash
+$ cargo sqlx migrate run
+Applied migrations/20211001154420 <name> (32.517835ms)
+```
+
+And reverts work as well:
+
+```bash
+$ cargo sqlx migrate revert
+Applied 20211001154420/revert <name>
+```
+
+**Note**: attempting to mix "simple" migrations with reversible migrations with result in an error.
+
+```bash
+$ cargo sqlx migrate add <name1>
+Creating migrations/20211001154420_<name>.sql
+
+$ cargo sqlx migrate add -r <name2>
+error: cannot mix reversible migrations with simple migrations. All migrations should be reversible or simple migrations
+```
+
+#### Enable building in "offline mode" with `query!()`
+
+Note: must be run as `cargo sqlx`.
+
+```bash
+cargo sqlx prepare
+```
+
+Saves query metadata to `sqlx-data.json` in the current directory; check this file into version
+control and an active database connection will no longer be needed to build your project.
+
+Has no effect unless the `offline` feature of `sqlx` is enabled in your project. Omitting that
+feature is the most likely cause if you get a `sqlx-data.json` file that looks like this:
+
+```json
+{
+    "database": "PostgreSQL"
+}
+```
+
+---
+
+```bash
+cargo sqlx prepare --check
+```
+
+Exits with a nonzero exit status if the data in `sqlx-data.json` is out of date with the current
+database schema and queries in the project. Intended for use in Continuous Integration.
+
+#### Force building in offline mode
+
+To make sure an accidentally-present `DATABASE_URL` environment variable or `.env` file does not
+result in `cargo build` (trying to) access the database, you can set the `SQLX_OFFLINE` environment
+variable to `true`.
+
+If you want to make this the default, just add it to your `.env` file. `cargo sqlx prepare` will
+still do the right thing and connect to the database.
+
+#### Include queries behind feature flags (such as queryies inside of tests)
+
+In order for sqlx to be able to find queries behind certain feature flags you need to turn them
+on by passing arguments to rustc.
+
+This is how you would turn all targets and features on.
+```bash
+cargo sqlx prepare -- --all-targets --all-features
+```
 
 ## Sqlite
 
