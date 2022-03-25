@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS "AccessHub" (
     "name" TEXT NOT NULL DEFAULT '',
     "cloudLastAccessEventAt" DATETIME
 );
-/* CREATE TABLE sqlite_sequence(name,seq); */
 CREATE TABLE IF NOT EXISTS "AccessPoint" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL DEFAULT '',
