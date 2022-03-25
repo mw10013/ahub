@@ -39,6 +39,23 @@ cargo run mock deny -p1 -c666
 cargo run heartbeat --host "http://$(hostname).local:3000"
 ```
 
+## Sqlx CLI cheatsheet
+```bash
+cargo sqlx --help
+cargo sqlx database create
+cargo sqlx migrate add create
+cargo sqlx migrate run
+```
+Did you know you can embed your migrations in your application binary?
+On startup, after creating your database connection or pool, add:
+
+sqlx::migrate!().run(<&your_pool OR &mut your_connection>).await?;
+
+Note that the compiler won't pick up new migrations if no Rust source files have changed.
+You can create a Cargo build script to work around this with `sqlx migrate build-script`.
+
+See: https://docs.rs/sqlx/0.5/sqlx/macro.migrate.html
+
 ## Sqlx CLI run using cargo
 All commands require that a database url is provided. This can be done either with the `--database-url` command line option or by setting `DATABASE_URL`, either in the environment or in a `.env` file
 in the current working directory.
