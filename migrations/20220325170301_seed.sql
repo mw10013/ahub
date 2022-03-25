@@ -1,4 +1,4 @@
-INSERT INTO AccessHub VALUES(1,'Brooklyn BnB', null);
+INSERT INTO AccessHub VALUES(1, null);
 
 INSERT INTO AccessPoint VALUES(1,1);
 INSERT INTO AccessPoint VALUES(2,2);
