@@ -269,7 +269,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
 
     let mut user2points = HashMap::<i64, Vec<i64>>::new();
     let mut rows = sqlx::query_as::<_, User2Point>(
-        r#"select B as user_id, A as point_id from AccessPointToAccessUser"#,
+        r#"select access_user_id as user_id, access_point_id as point_id from AccessPointToAccessUser"#,
     )
     .fetch(pool);
     while let Some(u2p) = rows.try_next().await? {
@@ -435,14 +435,14 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
                     u.user.id
                 ));
             }
-            sqlx::query(r#"delete from AccessPointToAccessUser where B=?"#)
+            sqlx::query(r#"delete from AccessPointToAccessUser where access_user_id=?"#)
                 .bind(u.user.id)
                 .execute(&mut tx)
                 .await?;
             if !u.point_ids.is_empty() {
                 // insert or ignore?
                 let query = format!(
-                    r#"insert into AccessPointToAccessUser (B, A) values {}"#,
+                    r#"insert into AccessPointToAccessUser (access_user_id, access_point_id) values {}"#,
                     u.point_ids
                         .iter()
                         .map(|_| "(?,?)")
@@ -482,7 +482,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
                 .last_insert_rowid();
 
             let query = format!(
-                r#"insert into AccessPointToAccessUser (B, A) values {}"#,
+                r#"insert into AccessPointToAccessUser (access_user_id, access_point_id) values {}"#,
                 u.point_ids
                     .iter()
                     .map(|_| "(?,?)")
