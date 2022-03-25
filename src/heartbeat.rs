@@ -63,8 +63,6 @@ struct AccessUserResponseData {
 #[derive(Debug, Deserialize)]
 struct AccessPointResponseData {
     id: i64,
-    #[allow(dead_code)]
-    name: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -178,7 +176,7 @@ mod json_option_naive_date_time {
 }
 
 pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
-    let hub: Hub = sqlx::query_as("select id, cloudLastAccessEventAt from AccessHub")
+    let hub: Hub = sqlx::query_as("select id, cloud_last_access_event_at from AccessHub")
         .fetch_one(pool)
         .await?;
     println!("{:#?}", hub);
@@ -235,7 +233,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         || hub.cloud_last_access_event_at.unwrap() != data.access_hub.cloud_last_access_event_at
     {
         let rows_affected =
-            sqlx::query(r#"update AccessHub set cloudLastAccessEventAt = ? where id = ?"#)
+            sqlx::query(r#"update AccessHub set cloud_last_access_event_at = ? where id = ?"#)
                 .bind(data.access_hub.cloud_last_access_event_at)
                 .bind(hub.id)
                 .execute(pool)

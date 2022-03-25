@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "AccessHub" (
     "id" INTEGER NOT NULL PRIMARY KEY,
-    "cloudLastAccessEventAt" DATETIME
+    "cloud_last_access_event_at" DATETIME
 );
 CREATE TABLE IF NOT EXISTS "AccessPoint" (
     "id" INTEGER NOT NULL PRIMARY KEY,

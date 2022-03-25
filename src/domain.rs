@@ -1,5 +1,4 @@
 #[derive(Debug, sqlx::FromRow)]
-#[sqlx(rename_all = "camelCase")]
 pub struct Hub {
     pub id: i64,
     pub cloud_last_access_event_at: Option<chrono::NaiveDateTime>,
