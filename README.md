@@ -43,8 +43,9 @@ cargo run heartbeat --host "http://$(hostname).local:3000"
 ```bash
 cargo sqlx --help
 cargo sqlx database create
-cargo sqlx migrate add create
+cargo sqlx migrate add schema
 cargo sqlx migrate run
+cargo sqlx migrate add seed
 ```
 Did you know you can embed your migrations in your application binary?
 On startup, after creating your database connection or pool, add:
