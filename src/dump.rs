@@ -49,7 +49,7 @@ pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Resu
 
     let user_ids: Vec<i64> = users.iter().map(|u| u.id).collect();
     let query = format!(
-        "select access_user_id as user_id, access_point_id as point_id from AccessPointToAccessUser where access_user_id in ({})",
+        "select access_user_id, access_point_id from AccessPointToAccessUser where access_user_id in ({})",
         user_ids
             .iter()
             .map(|_| "?")
@@ -64,10 +64,10 @@ pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Resu
     let mut user2points = HashMap::<i64, Vec<i64>>::new();
     let mut rows = q.fetch(pool);
     while let Some(u2p) = rows.try_next().await? {
-        if let Some(points) = user2points.get_mut(&u2p.user_id) {
-            points.push(u2p.point_id);
+        if let Some(points) = user2points.get_mut(&u2p.access_user_id) {
+            points.push(u2p.access_point_id);
         } else {
-            user2points.insert(u2p.user_id, vec![u2p.point_id]);
+            user2points.insert(u2p.access_user_id, vec![u2p.access_point_id]);
         }
     }
     let point_ids: Vec<_> = user2points.values().flatten().copied().collect();
@@ -126,7 +126,7 @@ pub async fn dump_points(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
 
     let point_ids: Vec<i64> = points.iter().map(|p| p.id).collect();
     let query = format!(
-        "select access_point_id as point_id, access_user_id as user_id from AccessPointToAccessUser where access_point_id in ({})",
+        "select access_point_id, access_user_id from AccessPointToAccessUser where access_point_id in ({})",
         point_ids
             .iter()
             .map(|_| "?")
@@ -141,10 +141,10 @@ pub async fn dump_points(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     let mut point2users = HashMap::<i64, Vec<i64>>::new();
     let mut rows = q.fetch(pool);
     while let Some(p2u) = rows.try_next().await? {
-        if let Some(points) = point2users.get_mut(&p2u.user_id) {
-            points.push(p2u.point_id);
+        if let Some(points) = point2users.get_mut(&p2u.access_user_id) {
+            points.push(p2u.access_point_id);
         } else {
-            point2users.insert(p2u.user_id, vec![p2u.point_id]);
+            point2users.insert(p2u.access_user_id, vec![p2u.access_point_id]);
         }
     }
     let point_ids: Vec<_> = point2users.values().flatten().copied().collect();

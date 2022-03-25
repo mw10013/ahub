@@ -269,14 +269,14 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
 
     let mut user2points = HashMap::<i64, Vec<i64>>::new();
     let mut rows = sqlx::query_as::<_, User2Point>(
-        r#"select access_user_id as user_id, access_point_id as point_id from AccessPointToAccessUser"#,
+        r#"select access_user_id, access_point_id from AccessPointToAccessUser"#,
     )
     .fetch(pool);
     while let Some(u2p) = rows.try_next().await? {
-        if let Some(points) = user2points.get_mut(&u2p.user_id) {
-            points.push(u2p.point_id);
+        if let Some(points) = user2points.get_mut(&u2p.access_user_id) {
+            points.push(u2p.access_point_id);
         } else {
-            user2points.insert(u2p.user_id, vec![u2p.point_id]);
+            user2points.insert(u2p.access_user_id, vec![u2p.access_point_id]);
         }
     }
 

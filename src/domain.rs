@@ -25,8 +25,8 @@ pub struct PointWithRelations {
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct Point2User {
-    pub point_id: i64,
-    pub user_id: i64,
+    pub access_point_id: i64,
+    pub access_user_id: i64,
 }
 
 #[derive(PartialEq, Clone, Debug, sqlx::FromRow)]
@@ -46,8 +46,8 @@ pub struct UserWithRelations {
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct User2Point {
-    pub user_id: i64,
-    pub point_id: i64,
+    pub access_user_id: i64,
+    pub access_point_id: i64,
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
