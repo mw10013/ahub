@@ -13,20 +13,20 @@ mod sandbox;
 #[clap(author, version, about, long_about = None)]
 struct Cli {
     #[clap(subcommand)]
-    command: Commands,
+    command: Command,
 }
 
 #[derive(Subcommand)]
-enum Commands {
+enum Command {
     /// Dump database
     Dump {
         #[clap(subcommand)]
-        command: DumpCommands,
+        command: DumpCommand,
     },
     /// Mock access
     Mock {
         #[clap(subcommand)]
-        command: MockCommands,
+        command: MockCommand,
     },
     /// Post heartbeat to access cloud
     Heartbeat {
@@ -36,7 +36,7 @@ enum Commands {
 }
 
 #[derive(Subcommand, Debug)]
-enum DumpCommands {
+enum DumpCommand {
     /// Dump hub
     Hub {},
     /// Dump points
@@ -74,7 +74,7 @@ enum DumpCommands {
 }
 
 #[derive(Subcommand, Debug)]
-enum MockCommands {
+enum MockCommand {
     /// Mock grant
     Grant {
         /// Point id
@@ -107,35 +107,35 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     match args.command {
-        Commands::Dump { command } => match command {
-            DumpCommands::Hub {} => {
+        Command::Dump { command } => match command {
+            DumpCommand::Hub {} => {
                 dump::dump_hub(&pool).await?;
             }
-            DumpCommands::Points { take, skip } => {
+            DumpCommand::Points { take, skip } => {
                 dump::dump_points(take, skip, &pool).await?;
             }
-            DumpCommands::Users { take, skip } => {
+            DumpCommand::Users { take, skip } => {
                 dump::dump_users(take, skip, &pool).await?;
             }
-            DumpCommands::Events { take, skip } => {
+            DumpCommand::Events { take, skip } => {
                 dump::dump_events(take, skip, &pool).await?;
             }
-            DumpCommands::SqliteVersion {} => {
+            DumpCommand::SqliteVersion {} => {
                 dump::dump_sqlite_version(&pool).await?;
             }
         },
-        Commands::Mock { command } => match command {
-            MockCommands::Grant { point, user } => {
+        Command::Mock { command } => match command {
+            MockCommand::Grant { point, user } => {
                 mock::grant(user, point, &pool).await?;
             }
-            MockCommands::Deny { point, code } => {
+            MockCommand::Deny { point, code } => {
                 mock::deny(point, code, &pool).await?;
             }
-            MockCommands::Swap {} => {
+            MockCommand::Swap {} => {
                 mock::swap(&pool).await?;
             }
         },
-        Commands::Heartbeat { host } => heartbeat::heartbeat(host, &pool).await?,
+        Command::Heartbeat { host } => heartbeat::heartbeat(host, &pool).await?,
     }
     Ok(())
 }
