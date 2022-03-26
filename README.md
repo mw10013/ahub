@@ -4,14 +4,10 @@ Access hub command-line utility.
 
 ## Setup
 
-### Create .env in root and put DATABASE_URL in it for rust-analyzer.
-```bash
-DATABASE_URL="sqlite://db/dev.db"
-```
-
-###  Declare DATABASE_URL for cargo (relative path)
+### Copy .env.example to .env in root and edit.
 ```bash
 export DATABASE_URL="sqlite://db/dev.db"
+export ACCESS_API_URL="http://localhost:3000"
 ```
 
 ###  Launch config for debugging
@@ -25,6 +21,7 @@ export DATABASE_URL="sqlite://db/dev.db"
 Use "$(hostname).local" or nameserver ip to connect to Windows localhost. Must open port on Windows.
 ```bash
 echo "$(hostname).local"
+export ACCESS_API_URL="http://$(hostname).local:3000"
 cat /etc/resolv.conf
 ```    
 
@@ -37,7 +34,6 @@ cargo run dump users -t2
 cargo run mock grant -u1 -p1
 cargo run mock deny -p1 -c666
 cargo run heartbeat
-cargo run heartbeat --access-api-url "http://$(hostname).local:3000"
 ```
 
 ## Sqlx CLI cheatsheet
