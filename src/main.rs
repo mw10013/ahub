@@ -37,8 +37,8 @@ enum Command {
     /// Post heartbeat to access cloud
     Heartbeat {
         /// Access cloud host
-        #[clap(short = 'o', long, default_value_t = String::from("http://localhost:3000"))]
-        host: String,
+        #[clap(short = 'a', long, env)]
+        access_api_url: String,
 
         /// Location of the DB, by default will be read from the DATABASE_URL env var
         #[clap(long, short = 'D', env)]
@@ -156,9 +156,10 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        Command::Heartbeat { host, database_url } => {
-            heartbeat::heartbeat(&host, &database_url).await?
-        }
+        Command::Heartbeat {
+            access_api_url,
+            database_url,
+        } => heartbeat::heartbeat(&access_api_url, &database_url).await?,
     }
     Ok(())
 }

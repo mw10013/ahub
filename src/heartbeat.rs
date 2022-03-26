@@ -174,7 +174,7 @@ mod json_option_naive_date_time {
     }
 }
 
-pub async fn heartbeat(host: &str, database_url: &str) -> anyhow::Result<()> {
+pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Result<()> {
     let mut conn = SqliteConnection::connect(database_url).await?;
     let hub: Hub = sqlx::query_as("select id, cloud_last_access_event_at from AccessHub")
         .fetch_one(&mut conn)
@@ -206,7 +206,7 @@ pub async fn heartbeat(host: &str, database_url: &str) -> anyhow::Result<()> {
     println!("request_data: {:#?}", request_data);
     let client = reqwest::Client::new();
     let res = client
-        .post(format!("{}/api/accesshub/heartbeat", host))
+        .post(format!("{}/api/accesshub/heartbeat", access_api_url))
         .json(&request_data)
         .send()
         .await?;
