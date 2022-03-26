@@ -1,6 +1,6 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use sqlx::{sqlite::SqlitePool, SqliteConnection, Connection};
+use sqlx::{sqlite::SqlitePool, Connection, SqliteConnection};
 use std::env;
 
 mod domain;
@@ -29,6 +29,10 @@ enum Command {
     },
     /// Mock access
     Mock {
+        /// Location of the DB, by default will be read from the DATABASE_URL env var
+        #[clap(long, short = 'D', env)]
+        database_url: String,
+
         #[clap(subcommand)]
         command: MockCommand,
     },
@@ -112,37 +116,46 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     match args.command {
-        Command::Dump { database_url, command } => {
+        Command::Dump {
+            database_url,
+            command,
+        } => {
             let mut conn = SqliteConnection::connect(&database_url).await?;
             match command {
-            DumpCommand::Hub {} => {
-                dump::dump_hub(&mut conn).await?;
-            }
-            DumpCommand::Points { take, skip } => {
-                dump::dump_points(take, skip, &mut conn).await?;
-            }
-            DumpCommand::Users { take, skip } => {
-                dump::dump_users(take, skip, &mut conn).await?;
-            }
-            DumpCommand::Events { take, skip } => {
-                dump::dump_events(take, skip, &mut conn).await?;
-            }
-            DumpCommand::SqliteVersion {} => {
-                dump::dump_sqlite_version(&mut conn).await?;
+                DumpCommand::Hub {} => {
+                    dump::dump_hub(&mut conn).await?;
+                }
+                DumpCommand::Points { take, skip } => {
+                    dump::dump_points(take, skip, &mut conn).await?;
+                }
+                DumpCommand::Users { take, skip } => {
+                    dump::dump_users(take, skip, &mut conn).await?;
+                }
+                DumpCommand::Events { take, skip } => {
+                    dump::dump_events(take, skip, &mut conn).await?;
+                }
+                DumpCommand::SqliteVersion {} => {
+                    dump::dump_sqlite_version(&mut conn).await?;
+                }
             }
         }
-        },
-        Command::Mock { command } => match command {
-            MockCommand::Grant { point, user } => {
-                mock::grant(user, point, &pool).await?;
+        Command::Mock {
+            database_url,
+            command,
+        } => {
+            let mut conn = SqliteConnection::connect(&database_url).await?;
+            match command {
+                MockCommand::Grant { point, user } => {
+                    mock::grant(user, point, &mut conn).await?;
+                }
+                MockCommand::Deny { point, code } => {
+                    mock::deny(point, code, &mut conn).await?;
+                }
+                MockCommand::Swap {} => {
+                    mock::swap(&mut conn).await?;
+                }
             }
-            MockCommand::Deny { point, code } => {
-                mock::deny(point, code, &pool).await?;
-            }
-            MockCommand::Swap {} => {
-                mock::swap(&pool).await?;
-            }
-        },
+        }
         Command::Heartbeat { host } => heartbeat::heartbeat(host, &pool).await?,
     }
     Ok(())

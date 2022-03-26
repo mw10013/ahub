@@ -1,6 +1,6 @@
 use crate::domain::{Event, Hub, Point, Point2User, PointWithRelations, User, UserWithRelations};
 use futures::TryStreamExt;
-use sqlx::{SqliteConnection};
+use sqlx::SqliteConnection;
 use std::collections::HashMap;
 
 pub async fn dump_hub(conn: &mut SqliteConnection) -> anyhow::Result<()> {
