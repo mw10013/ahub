@@ -1,27 +1,25 @@
-use crate::domain::{
-    Event, Hub, Point, Point2User, PointWithRelations, User, UserWithRelations,
-};
+use crate::domain::{Event, Hub, Point, Point2User, PointWithRelations, User, UserWithRelations};
 use futures::TryStreamExt;
-use sqlx::sqlite::SqlitePool;
+use sqlx::{SqliteConnection};
 use std::collections::HashMap;
 
-pub async fn dump_hub(pool: &SqlitePool) -> anyhow::Result<()> {
+pub async fn dump_hub(conn: &mut SqliteConnection) -> anyhow::Result<()> {
     let hub: Hub = sqlx::query_as("select id, cloud_last_access_event_at from AccessHub")
-        .fetch_one(pool)
+        .fetch_one(conn)
         .await?;
     println!("{:#?}", hub);
     Ok(())
 }
 
-pub async fn dump_sqlite_version(pool: &SqlitePool) -> anyhow::Result<()> {
+pub async fn dump_sqlite_version(conn: &mut SqliteConnection) -> anyhow::Result<()> {
     let sqlite_version: (String,) = sqlx::query_as("select sqlite_version()")
-        .fetch_one(pool)
+        .fetch_one(conn)
         .await?;
     println!("sqlite_version: {}", sqlite_version.0);
     Ok(())
 }
 
-pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
+pub async fn dump_events(take: i32, skip: i32, conn: &mut SqliteConnection) -> anyhow::Result<()> {
     let events = sqlx::query_as::<_, Event>(
         r#"
         select id, at, access, code, access_user_id, access_point_id from AccessEvent order by at desc limit ? offset ?
@@ -29,7 +27,7 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     )
     .bind(take)
     .bind(skip)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
 
     for e in events {
@@ -38,13 +36,13 @@ pub async fn dump_events(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     Ok(())
 }
 
-pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
+pub async fn dump_users(take: i32, skip: i32, conn: &mut SqliteConnection) -> anyhow::Result<()> {
     let users = sqlx::query_as::<_, User>(
         r#"select id, name, code, activate_code_at, expire_code_at from AccessUser order by id asc limit ? offset ?"#,
     )
     .bind(take)
     .bind(skip)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
 
     let user_ids: Vec<i64> = users.iter().map(|u| u.id).collect();
@@ -62,12 +60,14 @@ pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Resu
     }
 
     let mut user2points = HashMap::<i64, Vec<i64>>::new();
-    let mut rows = q.fetch(pool);
-    while let Some(u2p) = rows.try_next().await? {
-        if let Some(points) = user2points.get_mut(&u2p.access_user_id) {
-            points.push(u2p.access_point_id);
-        } else {
-            user2points.insert(u2p.access_user_id, vec![u2p.access_point_id]);
+    {
+        let mut rows = q.fetch(&mut *conn);
+        while let Some(u2p) = rows.try_next().await? {
+            if let Some(points) = user2points.get_mut(&u2p.access_user_id) {
+                points.push(u2p.access_point_id);
+            } else {
+                user2points.insert(u2p.access_user_id, vec![u2p.access_point_id]);
+            }
         }
     }
     let point_ids: Vec<_> = user2points.values().flatten().copied().collect();
@@ -85,9 +85,11 @@ pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Resu
         q = q.bind(id);
     }
     let mut points = HashMap::<i64, Point>::new();
-    let mut rows = q.fetch(pool);
-    while let Some(p) = rows.try_next().await? {
-        points.insert(p.id, p);
+    {
+        let mut rows = q.fetch(&mut *conn);
+        while let Some(p) = rows.try_next().await? {
+            points.insert(p.id, p);
+        }
     }
 
     let users: Vec<UserWithRelations> = users
@@ -115,13 +117,13 @@ pub async fn dump_users(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Resu
     Ok(())
 }
 
-pub async fn dump_points(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Result<()> {
+pub async fn dump_points(take: i32, skip: i32, conn: &mut SqliteConnection) -> anyhow::Result<()> {
     let points = sqlx::query_as::<_, Point>(
         r#"select id, position from AccessPOint order by position asc limit ? offset ?"#,
     )
     .bind(take)
     .bind(skip)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
 
     let point_ids: Vec<i64> = points.iter().map(|p| p.id).collect();
@@ -139,14 +141,17 @@ pub async fn dump_points(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
     }
 
     let mut point2users = HashMap::<i64, Vec<i64>>::new();
-    let mut rows = q.fetch(pool);
-    while let Some(p2u) = rows.try_next().await? {
-        if let Some(points) = point2users.get_mut(&p2u.access_user_id) {
-            points.push(p2u.access_point_id);
-        } else {
-            point2users.insert(p2u.access_user_id, vec![p2u.access_point_id]);
+    {
+        let mut rows = q.fetch(&mut *conn);
+        while let Some(p2u) = rows.try_next().await? {
+            if let Some(points) = point2users.get_mut(&p2u.access_user_id) {
+                points.push(p2u.access_point_id);
+            } else {
+                point2users.insert(p2u.access_user_id, vec![p2u.access_point_id]);
+            }
         }
     }
+
     let point_ids: Vec<_> = point2users.values().flatten().copied().collect();
 
     let query = format!(
@@ -162,9 +167,11 @@ pub async fn dump_points(take: i32, skip: i32, pool: &SqlitePool) -> anyhow::Res
         q = q.bind(id);
     }
     let mut users = HashMap::<i64, User>::new();
-    let mut rows = q.fetch(pool);
-    while let Some(u) = rows.try_next().await? {
-        users.insert(u.id, u);
+    {
+        let mut rows = q.fetch(&mut *conn);
+        while let Some(u) = rows.try_next().await? {
+            users.insert(u.id, u);
+        }
     }
 
     let points: Vec<PointWithRelations> = points

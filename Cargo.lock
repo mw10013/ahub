@@ -21,6 +21,7 @@ dependencies = [
  "async-std",
  "chrono",
  "clap",
+ "dotenv",
  "futures",
  "reqwest",
  "serde",

@@ -1,6 +1,6 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use sqlx::sqlite::SqlitePool;
+use sqlx::{sqlite::SqlitePool, SqliteConnection, Connection};
 use std::env;
 
 mod domain;
@@ -20,6 +20,10 @@ struct Cli {
 enum Command {
     /// Dump database
     Dump {
+        /// Location of the DB, by default will be read from the DATABASE_URL env var
+        #[clap(long, short = 'D', env)]
+        database_url: String,
+
         #[clap(subcommand)]
         command: DumpCommand,
     },
@@ -102,27 +106,31 @@ enum MockCommand {
 // #[async_std::main]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    dotenv::dotenv().ok();
     let args = Cli::parse();
     let pool = SqlitePool::connect(&env::var("DATABASE_URL").context("DATABASE_URL not defined.")?)
         .await?;
 
     match args.command {
-        Command::Dump { command } => match command {
+        Command::Dump { database_url, command } => {
+            let mut conn = SqliteConnection::connect(&database_url).await?;
+            match command {
             DumpCommand::Hub {} => {
-                dump::dump_hub(&pool).await?;
+                dump::dump_hub(&mut conn).await?;
             }
             DumpCommand::Points { take, skip } => {
-                dump::dump_points(take, skip, &pool).await?;
+                dump::dump_points(take, skip, &mut conn).await?;
             }
             DumpCommand::Users { take, skip } => {
-                dump::dump_users(take, skip, &pool).await?;
+                dump::dump_users(take, skip, &mut conn).await?;
             }
             DumpCommand::Events { take, skip } => {
-                dump::dump_events(take, skip, &pool).await?;
+                dump::dump_events(take, skip, &mut conn).await?;
             }
             DumpCommand::SqliteVersion {} => {
-                dump::dump_sqlite_version(&pool).await?;
+                dump::dump_sqlite_version(&mut conn).await?;
             }
+        }
         },
         Command::Mock { command } => match command {
             MockCommand::Grant { point, user } => {
