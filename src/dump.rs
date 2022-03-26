@@ -195,7 +195,7 @@ pub async fn dump_points(take: i32, skip: i32, conn: &mut SqliteConnection) -> a
     // for u in &users {
     //     println!("{:#?}\n", u)
     // }
-    dbg!(&points);
+    println!("points {:#?}", points);
 
     Ok(())
 }

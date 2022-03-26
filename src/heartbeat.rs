@@ -1,9 +1,9 @@
-use crate::domain::{Hub, Point, User, Point2User};
+use crate::domain::{Hub, Point, Point2User, User};
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 // use anyhow::Context;
-use sqlx::sqlite::SqlitePool;
+use sqlx::{Connection, SqliteConnection};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -174,9 +174,10 @@ mod json_option_naive_date_time {
     }
 }
 
-pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
+pub async fn heartbeat(host: &str, database_url: &str) -> anyhow::Result<()> {
+    let mut conn = SqliteConnection::connect(database_url).await?;
     let hub: Hub = sqlx::query_as("select id, cloud_last_access_event_at from AccessHub")
-        .fetch_one(pool)
+        .fetch_one(&mut conn)
         .await?;
     println!("{:#?}", hub);
 
@@ -188,19 +189,16 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
                 where at > ? and at < DATETIME(CURRENT_TIMESTAMP, '-5 seconds') order by at desc",
             )
             .bind(cloud_last_access_event_at)
-            .fetch_all(pool)
+            .fetch_all(&mut conn)
             .await?
         }
         None => vec![],
     };
-    dbg!(&events);
+    println!("events {:#?}", events);
 
     let request_data = RequestData {
         access_hub: AccessHubRequestData {
             id: hub.id,
-            // cloud_last_access_event_at: Some(
-            //     chrono::NaiveDate::from_ymd(2014, 5, 17).and_hms(7, 30, 23),
-            // ),
             cloud_last_access_event_at: hub.cloud_last_access_event_at,
             access_events: events,
         },
@@ -235,7 +233,7 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
             sqlx::query(r#"update AccessHub set cloud_last_access_event_at = ? where id = ?"#)
                 .bind(data.access_hub.cloud_last_access_event_at)
                 .bind(hub.id)
-                .execute(pool)
+                .execute(&mut conn)
                 .await?
                 .rows_affected();
         if rows_affected != 1 {
@@ -246,10 +244,12 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     }
 
     let mut local_points = HashMap::<i64, Point>::new();
-    let mut rows =
-        sqlx::query_as::<_, Point>(r#"select id, position from AccessPoint"#).fetch(pool);
-    while let Some(u) = rows.try_next().await? {
-        local_points.insert(u.id, u);
+    {
+        let mut rows =
+            sqlx::query_as::<_, Point>(r#"select id, position from AccessPoint"#).fetch(&mut conn);
+        while let Some(u) = rows.try_next().await? {
+            local_points.insert(u.id, u);
+        }
     }
 
     let invalid_point_ids: HashSet<i64> = data
@@ -268,34 +268,38 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
     }
 
     let mut user2points = HashMap::<i64, Vec<i64>>::new();
-    let mut rows = sqlx::query_as::<_, Point2User>(
-        r#"select access_user_id, access_point_id from AccessPointToAccessUser"#,
-    )
-    .fetch(pool);
-    while let Some(u2p) = rows.try_next().await? {
-        if let Some(points) = user2points.get_mut(&u2p.access_user_id) {
-            points.push(u2p.access_point_id);
-        } else {
-            user2points.insert(u2p.access_user_id, vec![u2p.access_point_id]);
+    {
+        let mut rows = sqlx::query_as::<_, Point2User>(
+            r#"select access_user_id, access_point_id from AccessPointToAccessUser"#,
+        )
+        .fetch(&mut conn);
+        while let Some(u2p) = rows.try_next().await? {
+            if let Some(points) = user2points.get_mut(&u2p.access_user_id) {
+                points.push(u2p.access_point_id);
+            } else {
+                user2points.insert(u2p.access_user_id, vec![u2p.access_point_id]);
+            }
         }
     }
 
     let mut local_users = HashMap::<i64, UserWithPointIds>::new();
-    let mut rows = sqlx::query_as::<_, User>(
-        r#"select id, name, code, activate_code_at, expire_code_at from AccessUser"#,
-    )
-    .fetch(pool);
-    while let Some(u) = rows.try_next().await? {
-        let id = u.id;
-        local_users.insert(
-            id,
-            UserWithPointIds {
-                user: u,
-                point_ids: user2points.remove(&id).unwrap_or_default(),
-            },
-        );
+    {
+        let mut rows = sqlx::query_as::<_, User>(
+            r#"select id, name, code, activate_code_at, expire_code_at from AccessUser"#,
+        )
+        .fetch(&mut conn);
+        while let Some(u) = rows.try_next().await? {
+            let id = u.id;
+            local_users.insert(
+                id,
+                UserWithPointIds {
+                    user: u,
+                    point_ids: user2points.remove(&id).unwrap_or_default(),
+                },
+            );
+        }
     }
-    dbg!(&local_users);
+    println!("local_users {:#?}", local_users);
 
     let mut cloud_users = HashMap::<i64, UserWithPointIds>::new();
     let cloud_users_len = data.access_hub.access_users.len();
@@ -365,17 +369,17 @@ pub async fn heartbeat(host: String, pool: &SqlitePool) -> anyhow::Result<()> {
         .filter(|x| changed_codes.contains(&*x.user.code))
         .collect();
 
-    dbg!(&cloud_users);
-    dbg!(&create_users);
-    dbg!(&update_users);
-    dbg!(&common_ids);
-    dbg!(&delete_ids);
-    dbg!(&changed_codes);
-    dbg!(&recycled_code_local_users);
+    println!("cloud_users {:#?}", cloud_users);
+    println!("create_users {:#?}", create_users);
+    println!("update_users {:#?}", update_users);
+    println!("common_ids {:?}", common_ids);
+    println!("delete_ids {:?}", delete_ids);
+    println!("changed_codes {:?}", changed_codes);
+    println!("recycled_code_local_users {:#?}", recycled_code_local_users);
 
     // Access user codes must be unique: delete, update recyled codes, update, create.
     // TODO: Transaction
-    let mut tx = pool.begin().await?;
+    let mut tx = conn.begin().await?;
     if !delete_ids.is_empty() {
         let query = format!(
             "delete from AccessUser where id in ({})",

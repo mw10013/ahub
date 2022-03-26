@@ -97,7 +97,7 @@ pub async fn swap(conn: &mut SqliteConnection) -> anyhow::Result<()> {
     .bind(2)
     .fetch_all(&mut *conn)
     .await?;
-    dbg!(&users);
+    println!("users {:#?}", users);
 
     Ok(())
 }

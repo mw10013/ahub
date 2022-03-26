@@ -1,7 +1,5 @@
-use anyhow::Context;
 use clap::{Parser, Subcommand};
-use sqlx::{sqlite::SqlitePool, Connection, SqliteConnection};
-use std::env;
+use sqlx::{SqliteConnection, Connection};
 
 mod domain;
 mod dump;
@@ -38,8 +36,13 @@ enum Command {
     },
     /// Post heartbeat to access cloud
     Heartbeat {
+        /// Access cloud host
         #[clap(short = 'o', long, default_value_t = String::from("http://localhost:3000"))]
         host: String,
+
+        /// Location of the DB, by default will be read from the DATABASE_URL env var
+        #[clap(long, short = 'D', env)]
+        database_url: String,
     },
 }
 
@@ -112,9 +115,6 @@ enum MockCommand {
 async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     let args = Cli::parse();
-    let pool = SqlitePool::connect(&env::var("DATABASE_URL").context("DATABASE_URL not defined.")?)
-        .await?;
-
     match args.command {
         Command::Dump {
             database_url,
@@ -156,7 +156,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        Command::Heartbeat { host } => heartbeat::heartbeat(host, &pool).await?,
+        Command::Heartbeat { host, database_url } => heartbeat::heartbeat(&host, &database_url).await?,
     }
     Ok(())
 }
