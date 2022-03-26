@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use sqlx::{SqliteConnection, Connection};
+use sqlx::{Connection, SqliteConnection};
 
 mod domain;
 mod dump;
@@ -156,7 +156,9 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        Command::Heartbeat { host, database_url } => heartbeat::heartbeat(&host, &database_url).await?,
+        Command::Heartbeat { host, database_url } => {
+            heartbeat::heartbeat(&host, &database_url).await?
+        }
     }
     Ok(())
 }
