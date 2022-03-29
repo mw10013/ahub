@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS "AccessPointToAccessUser" (
     FOREIGN KEY ("access_user_id") REFERENCES "AccessUser" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-create view if not exists ActiveCodes as 
+create view if not exists ActiveCode as 
 select access_point_id, position, code, access_user_id, activate_code_at, expire_code_at 
 from AccessUser u join AccessPointToAccessUser p2u on u.id = p2u.access_user_id 
   join AccessPoint p on p2u.access_point_id = p.id 

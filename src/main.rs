@@ -80,6 +80,9 @@ enum DumpCommand {
         #[clap(short, long, parse(try_from_str), default_value_t = 0)]
         skip: i32,
     },
+    /// Dump active codes
+    Codes {
+    },
     /// Dump sqlite version
     SqliteVersion {},
 }
@@ -133,6 +136,9 @@ async fn main() -> anyhow::Result<()> {
                 }
                 DumpCommand::Events { take, skip } => {
                     dump::dump_events(take, skip, &mut conn).await?;
+                }
+                DumpCommand::Codes {} => {
+                    dump::dump_codes(&mut conn).await?;
                 }
                 DumpCommand::SqliteVersion {} => {
                     dump::dump_sqlite_version(&mut conn).await?;

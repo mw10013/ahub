@@ -53,3 +53,13 @@ pub struct Event {
     pub access_user_id: Option<i64>,
     pub access_point_id: i64,
 }
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct ActiveCode {
+    pub access_point_id: i64,
+    pub position: i64,
+    pub code: String,
+    pub access_user_id: i64,
+    pub activate_code_at: Option<chrono::NaiveDateTime>,
+    pub expire_code_at: Option<chrono::NaiveDateTime>,
+}
