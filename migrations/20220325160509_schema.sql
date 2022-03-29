@@ -1,32 +1,32 @@
-CREATE TABLE IF NOT EXISTS AccessHub (
-    id INTEGER NOT NULL PRIMARY KEY,
-    cloud_last_access_event_at DATETIME
+create table if not exists AccessHub (
+    id integer not null primary key,
+    cloud_last_access_event_at datetime
 );
-CREATE TABLE IF NOT EXISTS AccessPoint (
-    id INTEGER NOT NULL PRIMARY KEY,
-    position INTEGER NOT NULL
+create table if not exists AccessPoint (
+    id integer not null primary key,
+    position integer not null
 );
-CREATE TABLE IF NOT EXISTS AccessUser (
-    id INTEGER NOT NULL PRIMARY KEY,
-    name TEXT NOT NULL DEFAULT '',
-    code TEXT NOT NULL,
-    activate_code_at DATETIME,
-    expire_code_at DATETIME
+create table if not exists AccessUser (
+    id integer not null primary key,
+    name text not null default '',
+    code text not null,
+    activate_code_at datetime,
+    expire_code_at datetime
 );
-CREATE TABLE IF NOT EXISTS AccessEvent (
-    id INTEGER NOT NULL PRIMARY KEY,
-    at DATETIME NOT NULL,
-    access TEXT NOT NULL,
-    code TEXT NOT NULL,
-    access_user_id INTEGER,
-    access_point_id INTEGER NOT NULL,
-    CONSTRAINT AccessEvent_access_point_id_fkey FOREIGN KEY (access_point_id) REFERENCES AccessPoint (id) ON DELETE RESTRICT ON UPDATE CASCADE
+create table if not exists AccessEvent (
+    id integer not null primary key,
+    at datetime not null,
+    access text not null,
+    code text not null,
+    access_user_id integer,
+    access_point_id integer not null,
+    constraint AccessEvent_access_point_id_fkey foreign key (access_point_id) references AccessPoint (id) on delete restrict on update cascade
 );
-CREATE TABLE IF NOT EXISTS AccessPointToAccessUser (
-    access_point_id INTEGER NOT NULL,
-    access_user_id INTEGER NOT NULL,
-    FOREIGN KEY (access_point_id) REFERENCES AccessPoint (id) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (access_user_id) REFERENCES AccessUser (id) ON DELETE CASCADE ON UPDATE CASCADE
+create table if not exists AccessPointToAccessUser (
+    access_point_id integer not null,
+    access_user_id integer not null,
+    foreign key (access_point_id) references AccessPoint (id) on delete cascade on update cascade,
+    foreign key (access_user_id) references AccessUser (id) on delete cascade on update cascade
 );
 
 create view if not exists ActiveCode as 
@@ -37,7 +37,7 @@ where (activate_code_at is null or activate_code_at <= current_timestamp)
   and (expire_code_at is null or current_timestamp < expire_code_at) 
 order by position asc, code asc;
 
-CREATE UNIQUE INDEX AccessPoint_position_key ON AccessPoint(position);
-CREATE UNIQUE INDEX AccessUser_code_key ON AccessUser(code);
-CREATE UNIQUE INDEX AccessPointToAccessUser_unique ON AccessPointToAccessUser(access_point_id, access_user_id);
-CREATE INDEX AccessPointToAccessUser_access_user_id_index ON AccessPointToAccessUser(access_user_id);
+create unique index AccessPoint_position_key on AccessPoint(position);
+create unique index AccessUser_code_key on AccessUser(code);
+create unique index AccessPointToAccessUser_unique on AccessPointToAccessUser(access_point_id, access_user_id);
+create index AccessPointToAccessUser_access_user_id_index on AccessPointToAccessUser(access_user_id);

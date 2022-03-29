@@ -9,7 +9,7 @@ pub async fn access(code: &str, position: i64, database_url: &str) -> anyhow::Re
         ));
     }
     let mut conn = SqliteConnection::connect(database_url).await?;
-    let code = sqlx::query_as::<_, ActiveCode>(
+    let active_code = sqlx::query_as::<_, ActiveCode>(
         r#"select access_point_id, position, code, access_user_id, activate_code_at, expire_code_at
         from ActiveCode where code = ? and position = ?"#,
     )
@@ -18,20 +18,42 @@ pub async fn access(code: &str, position: i64, database_url: &str) -> anyhow::Re
     .fetch_optional(&mut conn)
     .await?;
 
-    if code.is_some() {
-        println!("GRANT");
-    }
-    else {
-        let point = sqlx::query_as::<_, Point>(
-            r#"select id, position from AccessPoint where position = ?"#)
+    match active_code {
+        Some(active_code) => {
+            let _id = sqlx::query!(
+            r#"
+            INSERT INTO AccessEvent (at, access, code, access_user_id, access_point_id) VALUES (CURRENT_TIMESTAMP,'grant', ?, ?, ?)       
+            "#,
+            active_code.code, active_code.access_user_id, active_code.access_point_id)
+                .execute(&mut conn)
+                .await?
+                .last_insert_rowid();
+            println!("GRANT");
+        }
+        None => {
+            let point = sqlx::query_as::<_, Point>(
+                r#"select id, position from AccessPoint where position = ?"#,
+            )
             .bind(position)
             .fetch_optional(&mut conn)
             .await?;
-        if point.is_none() {
-            return Err(anyhow::anyhow!("Position {} does not exist", position));
+            match point {
+                Some(point) => {
+                    let _id = sqlx::query!(
+                        r#"
+                        INSERT INTO AccessEvent (at, access, code, access_point_id) VALUES (CURRENT_TIMESTAMP,'deny', ?, ?)       
+                        "#,
+                        code, point.id)
+                            .execute(&mut conn)
+                            .await?
+                            .last_insert_rowid();
+                    println!("DENY")
+                }
+                None => {
+                    return Err(anyhow::anyhow!("Position {} does not exist", position));
+                }
+            }
         }
-        println!("DENY")
     }
-
     Ok(())
 }
