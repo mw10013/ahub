@@ -5,12 +5,14 @@ Access hub command-line utility.
 ## Setup
 
 ### Copy .env.example to .env in root and edit.
+
 ```bash
 export DATABASE_URL="sqlite://db/dev.db"
 export ACCESS_API_URL="http://localhost:3000"
 ```
 
-###  Launch config for debugging
+### Launch config for debugging
+
 ```json
 "env": {
     "DATABASE_URL": "sqlite://db/dev.db",
@@ -18,17 +20,20 @@ export ACCESS_API_URL="http://localhost:3000"
 ```
 
 ### WSL
+
 Use "$(hostname).local" or nameserver ip to connect to Windows localhost. Must open port on Windows.
+
 ```bash
 echo "$(hostname).local"
 export ACCESS_API_URL="http://$(hostname).local:3000"
 cat /etc/resolv.conf
-```    
+```
 
 ## Cargo in root
+
 ```bash
 cargo run -- --help
-cargo run dump sqlite-version   
+cargo run dump sqlite-version
 cargo run dump events
 cargo run dump users -t2
 cargo run mock grant -u1 -p1
@@ -37,6 +42,7 @@ cargo run heartbeat
 ```
 
 ## Sqlx CLI cheatsheet
+
 ```bash
 cargo sqlx --help
 cargo sqlx database setup
@@ -44,6 +50,7 @@ cargo sqlx migrate add schema
 cargo sqlx migrate run
 cargo sqlx database reset -y
 ```
+
 Did you know you can embed your migrations in your application binary?
 On startup, after creating your database connection or pool, add:
 
@@ -55,6 +62,7 @@ You can create a Cargo build script to work around this with `sqlx migrate build
 See: https://docs.rs/sqlx/0.5/sqlx/macro.migrate.html
 
 ## Sqlx CLI run using cargo
+
 All commands require that a database url is provided. This can be done either with the `--database-url` command line option or by setting `DATABASE_URL`, either in the environment or in a `.env` file
 in the current working directory.
 
@@ -77,13 +85,16 @@ cargo sqlx database drop
 ```bash
 $ cargo sqlx migrate add <name>
 ```
+
 Creates a new file in `migrations/<timestamp>-<name>.sql`. Add your database schema changes to
 this new file.
 
 ---
+
 ```bash
 $ cargo sqlx migrate run
 ```
+
 Compares the migration history of the running database against the `migrations/` folder and runs
 any scripts that are still pending.
 
@@ -137,7 +148,7 @@ feature is the most likely cause if you get a `sqlx-data.json` file that looks l
 
 ```json
 {
-    "database": "PostgreSQL"
+  "database": "PostgreSQL"
 }
 ```
 
@@ -165,6 +176,7 @@ In order for sqlx to be able to find queries behind certain feature flags you ne
 on by passing arguments to rustc.
 
 This is how you would turn all targets and features on.
+
 ```bash
 cargo sqlx prepare -- --all-targets --all-features
 ```
@@ -179,10 +191,17 @@ cargo sqlx prepare -- --all-targets --all-features
 - bumped to 3.38.1 but not released yet https://github.com/rusqlite/rusqlite/commit/c3b419b1e53925c02e35a0dde019727153e1e6a8
 - sqlx has libsqlite3-sys 0.23.2
 - https://crates.io/crates/libsqlite3-sys/0.23.2
--  currently SQLite 3.36.0 (as of rusqlite 0.26.0 / libsqlite3-sys 0.23.0).
+- currently SQLite 3.36.0 (as of rusqlite 0.26.0 / libsqlite3-sys 0.23.0).
 - https://github.com/rusqlite/rusqlite/releases
--  libsqlite3-sys 0.24.1 (latest) has sqlite 3.38.0 bundled
+- libsqlite3-sys 0.24.1 (latest) has sqlite 3.38.0 bundled
 - libsqlite3-sys-v0.23.1: SQLITE_VERSION_NUMBER: i32 = 3036000;
 - 11/28/2021: https://github.com/rusqlite/rusqlite/commit/795a53d3682d5daf0b31f9a37eac4052c55558ca
--  https://github.com/rusqlite/rusqlite/commit/795a53d3682d5daf0b31f9a37eac4052c55558ca
+- https://github.com/rusqlite/rusqlite/commit/795a53d3682d5daf0b31f9a37eac4052c55558ca
 - debian bullseye sqlite version: 3.34.1
+
+## Queries
+
+- select \* from AccessUser u join AccessPointToAccessUser p2u on u.id = p2u.access_user_id join AccessPoint p on p2u.access_point_id = p.id;
+- select \* from AccessUser u join AccessPointToAccessUser p2u on u.id = p2u.access_user_id join AccessPoint p on p2u.access_point_id = p.id order by position asc, code asc;
+- select access_point_id, position, code, access_user_id, activate_code_at, expire_code_at from AccessUser u join AccessPointToAccessUser p2u on u.id = p2u.access_user_id join AccessPoint p on p2u.access_point_id = p.id order by position asc, code asc;
+- select access_point_id, position, code, access_user_id, activate_code_at, expire_code_at from AccessUser u join AccessPointToAccessUser p2u on u.id = p2u.access_user_id join AccessPoint p on p2u.access_point_id = p.id where (activate_code_at is null or activate_code_at <= current_timestamp) and (expire_code_at is null or current_timestamp < expire_code_at) order by position asc, code asc;
