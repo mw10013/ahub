@@ -5,6 +5,7 @@ mod domain;
 mod dump;
 mod heartbeat;
 mod mock;
+mod access;
 mod sandbox;
 
 #[derive(Parser)]
@@ -39,6 +40,20 @@ enum Command {
         /// Access cloud host
         #[clap(short = 'a', long, env)]
         access_api_url: String,
+
+        /// Location of the DB, by default will be read from the DATABASE_URL env var
+        #[clap(long, short = 'D', env)]
+        database_url: String,
+    },
+    /// Access with code for point at position. Position is 1-based. Returns "GRANT" | "DENY"
+    Access {
+        /// Code
+        #[clap(short, long)]
+        code: String,
+
+        /// Point position (1-based)
+        #[clap(short, long, parse(try_from_str))]
+        position: i64,
 
         /// Location of the DB, by default will be read from the DATABASE_URL env var
         #[clap(long, short = 'D', env)]
@@ -81,8 +96,7 @@ enum DumpCommand {
         skip: i32,
     },
     /// Dump active codes
-    Codes {
-    },
+    Codes {},
     /// Dump sqlite version
     SqliteVersion {},
 }
@@ -166,6 +180,11 @@ async fn main() -> anyhow::Result<()> {
             access_api_url,
             database_url,
         } => heartbeat::heartbeat(&access_api_url, &database_url).await?,
+        Command::Access {
+            code,
+            position,
+            database_url,
+        } => access::access(&code, position, &database_url).await?,
     }
     Ok(())
 }
