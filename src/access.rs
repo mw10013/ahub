@@ -9,12 +9,13 @@ pub async fn access(code: &str, position: i64, database_url: &str) -> anyhow::Re
         ));
     }
     let mut conn = SqliteConnection::connect(database_url).await?;
-    let active_code = sqlx::query_as::<_, ActiveCode>(
+    let active_code = sqlx::query_as!(
+        ActiveCode,
         r#"select access_point_id, position, code, access_user_id, activate_code_at, expire_code_at
         from ActiveCode where code = ? and position = ?"#,
+        code,
+        position
     )
-    .bind(code)
-    .bind(position)
     .fetch_optional(&mut conn)
     .await?;
 
@@ -31,10 +32,11 @@ pub async fn access(code: &str, position: i64, database_url: &str) -> anyhow::Re
             println!("GRANT");
         }
         None => {
-            let point = sqlx::query_as::<_, Point>(
+            let point = sqlx::query_as!(
+                Point,
                 r#"select id, position from AccessPoint where position = ?"#,
+                position
             )
-            .bind(position)
             .fetch_optional(&mut conn)
             .await?;
             match point {
