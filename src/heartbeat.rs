@@ -376,72 +376,118 @@ pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Resu
     println!("recycled_code_local_users {:#?}", recycled_code_local_users);
 
     // Access user codes must be unique: delete, update recyled codes, update, create.
-    // TODO: Transaction
-    let mut tx = conn.begin().await?;
-    if !delete_ids.is_empty() {
-        let query = format!(
-            "delete from AccessUser where id in ({})",
-            delete_ids
-                .iter()
-                .map(|_| "?")
-                .collect::<Vec<&str>>()
-                .join(", ")
-        );
-        let mut q = sqlx::query(&query);
-        for id in delete_ids.iter() {
-            q = q.bind(id);
-        }
-        let rows_affected = q.execute(&mut tx).await?.rows_affected();
-        if rows_affected as usize != delete_ids.len() {
-            return Err(anyhow::anyhow!(
-                "Delete users affected {} rows instead of {}.",
-                rows_affected,
-                delete_ids.len()
-            ));
-        }
-    }
-
-    if !recycled_code_local_users.is_empty() {
-        // TODO: Robus way to make recycled code unique.
-        for u in recycled_code_local_users {
-            let rows_affected = sqlx::query(r#"update AccessUser set code = ? where id = ?"#)
-                .bind(format!("{}-", &u.user.code))
-                .bind(u.user.id)
-                .execute(&mut tx)
-                .await?
-                .rows_affected();
-            if rows_affected != 1 {
+    if delete_ids.is_empty()
+        && recycled_code_local_users.is_empty()
+        && update_users.is_empty()
+        && create_users.is_empty()
+    {
+        println!("No changes to access users.")
+    } else {
+        let mut tx = conn.begin().await?;
+        if !delete_ids.is_empty() {
+            let query = format!(
+                "delete from AccessUser where id in ({})",
+                delete_ids
+                    .iter()
+                    .map(|_| "?")
+                    .collect::<Vec<&str>>()
+                    .join(", ")
+            );
+            let mut q = sqlx::query(&query);
+            for id in delete_ids.iter() {
+                q = q.bind(id);
+            }
+            let rows_affected = q.execute(&mut tx).await?.rows_affected();
+            if rows_affected as usize != delete_ids.len() {
                 return Err(anyhow::anyhow!(
-                    "Update user {} recyled code affected no rows",
-                    u.user.id
+                    "Delete users affected {} rows instead of {}.",
+                    rows_affected,
+                    delete_ids.len()
                 ));
             }
         }
-    }
 
-    if !update_users.is_empty() {
-        for u in update_users {
-            let rows_affected = sqlx::query(
-                r#"update AccessUser set code=?, activate_code_at=?, expire_code_at=? where id=?"#)
+        if !recycled_code_local_users.is_empty() {
+            // TODO: Robus way to make recycled code unique.
+            for u in recycled_code_local_users {
+                let rows_affected = sqlx::query(r#"update AccessUser set code = ? where id = ?"#)
+                    .bind(format!("{}-", &u.user.code))
+                    .bind(u.user.id)
+                    .execute(&mut tx)
+                    .await?
+                    .rows_affected();
+                if rows_affected != 1 {
+                    return Err(anyhow::anyhow!(
+                        "Update user {} recyled code affected no rows",
+                        u.user.id
+                    ));
+                }
+            }
+        }
+
+        if !update_users.is_empty() {
+            for u in update_users {
+                let rows_affected = sqlx::query(
+                r#"update AccessUser set code=?, activate_code_at=?, expire_code_at=? where id=?"#,
+            )
+            .bind(&u.user.code)
+            .bind(u.user.activate_code_at)
+            .bind(u.user.expire_code_at)
+            .bind(u.user.id)
+            .execute(&mut tx)
+            .await?
+            .rows_affected();
+                if rows_affected != 1 {
+                    return Err(anyhow::anyhow!(
+                        "Update user {} affected no rows",
+                        u.user.id
+                    ));
+                }
+                sqlx::query(r#"delete from AccessPointToAccessUser where access_user_id=?"#)
+                    .bind(u.user.id)
+                    .execute(&mut tx)
+                    .await?;
+                if !u.point_ids.is_empty() {
+                    // insert or ignore?
+                    let query = format!(
+                        r#"insert into AccessPointToAccessUser (access_user_id, access_point_id) values {}"#,
+                        u.point_ids
+                            .iter()
+                            .map(|_| "(?,?)")
+                            .collect::<Vec<&str>>()
+                            .join(",")
+                    );
+                    let mut q = sqlx::query(&query);
+                    q = u
+                        .point_ids
+                        .iter()
+                        .fold(q, |q, id| q.bind(u.user.id).bind(id));
+
+                    let rows_affected = q.execute(&mut tx).await?.rows_affected();
+                    if rows_affected as usize != u.point_ids.len() {
+                        return Err(anyhow::anyhow!(
+                            "Inserting user {} points affected {} rows instead of {}",
+                            u.user.id,
+                            rows_affected,
+                            u.point_ids.len()
+                        ));
+                    }
+                }
+            }
+        }
+
+        if !create_users.is_empty() {
+            for u in create_users {
+                let last_insert_rowid = sqlx::query(
+            r#"insert into AccessUser (id, code, activate_code_at, expire_code_at) values (?, ?, ?, ?)"#)
+                .bind(u.user.id)
                 .bind(&u.user.code)
                 .bind(u.user.activate_code_at)
                 .bind(u.user.expire_code_at)
-                .bind(u.user.id)
                 .execute(&mut tx)
                 .await?
-                .rows_affected();
-            if rows_affected != 1 {
-                return Err(anyhow::anyhow!(
-                    "Update user {} affected no rows",
-                    u.user.id
-                ));
-            }
-            sqlx::query(r#"delete from AccessPointToAccessUser where access_user_id=?"#)
-                .bind(u.user.id)
-                .execute(&mut tx)
-                .await?;
-            if !u.point_ids.is_empty() {
-                // insert or ignore?
+                .last_insert_rowid();
+
                 let query = format!(
                     r#"insert into AccessPointToAccessUser (access_user_id, access_point_id) values {}"#,
                     u.point_ids
@@ -454,7 +500,7 @@ pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Resu
                 q = u
                     .point_ids
                     .iter()
-                    .fold(q, |q, id| q.bind(u.user.id).bind(id));
+                    .fold(q, |q, id| q.bind(last_insert_rowid).bind(id));
 
                 let rows_affected = q.execute(&mut tx).await?.rows_affected();
                 if rows_affected as usize != u.point_ids.len() {
@@ -467,46 +513,8 @@ pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Resu
                 }
             }
         }
+        tx.commit().await?;
     }
-
-    if !create_users.is_empty() {
-        for u in create_users {
-            let last_insert_rowid = sqlx::query(
-            r#"insert into AccessUser (id, code, activate_code_at, expire_code_at) values (?, ?, ?, ?)"#)
-                .bind(u.user.id)
-                .bind(&u.user.code)
-                .bind(u.user.activate_code_at)
-                .bind(u.user.expire_code_at)
-                .execute(&mut tx)
-                .await?
-                .last_insert_rowid();
-
-            let query = format!(
-                r#"insert into AccessPointToAccessUser (access_user_id, access_point_id) values {}"#,
-                u.point_ids
-                    .iter()
-                    .map(|_| "(?,?)")
-                    .collect::<Vec<&str>>()
-                    .join(",")
-            );
-            let mut q = sqlx::query(&query);
-            q = u
-                .point_ids
-                .iter()
-                .fold(q, |q, id| q.bind(last_insert_rowid).bind(id));
-
-            let rows_affected = q.execute(&mut tx).await?.rows_affected();
-            if rows_affected as usize != u.point_ids.len() {
-                return Err(anyhow::anyhow!(
-                    "Inserting user {} points affected {} rows instead of {}",
-                    u.user.id,
-                    rows_affected,
-                    u.point_ids.len()
-                ));
-            }
-        }
-    }
-    tx.commit().await?;
 
     Ok(())
 }
