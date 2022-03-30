@@ -32,7 +32,6 @@ pub struct Point2User {
 #[derive(PartialEq, Clone, Debug, sqlx::FromRow)]
 pub struct User {
     pub id: i64,
-    pub name: String,
     pub code: String,
     pub activate_code_at: Option<chrono::NaiveDateTime>,
     pub expire_code_at: Option<chrono::NaiveDateTime>,

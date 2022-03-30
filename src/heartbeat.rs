@@ -50,7 +50,6 @@ struct AccessHubResponseData {
 #[serde(rename_all = "camelCase")]
 struct AccessUserResponseData {
     id: i64,
-    name: String,
     code: String,
     #[serde(with = "json_option_naive_date_time")]
     activate_code_at: Option<chrono::NaiveDateTime>,
@@ -285,7 +284,7 @@ pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Resu
     let mut local_users = HashMap::<i64, UserWithPointIds>::new();
     {
         let mut rows = sqlx::query_as::<_, User>(
-            r#"select id, name, code, activate_code_at, expire_code_at from AccessUser"#,
+            r#"select id, code, activate_code_at, expire_code_at from AccessUser"#,
         )
         .fetch(&mut conn);
         while let Some(u) = rows.try_next().await? {
@@ -321,7 +320,6 @@ pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Resu
             UserWithPointIds {
                 user: User {
                     id: cloud_user_data.id,
-                    name: cloud_user_data.name,
                     code: cloud_user_data.code,
                     activate_code_at: cloud_user_data.activate_code_at,
                     expire_code_at: cloud_user_data.expire_code_at,
@@ -424,8 +422,7 @@ pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Resu
     if !update_users.is_empty() {
         for u in update_users {
             let rows_affected = sqlx::query(
-                r#"update AccessUser set name=?, code=?, activate_code_at=?, expire_code_at=? where id=?"#)
-                .bind(&u.user.name)
+                r#"update AccessUser set code=?, activate_code_at=?, expire_code_at=? where id=?"#)
                 .bind(&u.user.code)
                 .bind(u.user.activate_code_at)
                 .bind(u.user.expire_code_at)
@@ -475,9 +472,8 @@ pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Resu
     if !create_users.is_empty() {
         for u in create_users {
             let last_insert_rowid = sqlx::query(
-            r#"insert into AccessUser (id, name, code, activate_code_at, expire_code_at) values (?, ?, ?, ?, ?)"#)
+            r#"insert into AccessUser (id, code, activate_code_at, expire_code_at) values (?, ?, ?, ?)"#)
                 .bind(u.user.id)
-                .bind(&u.user.name)
                 .bind(&u.user.code)
                 .bind(u.user.activate_code_at)
                 .bind(u.user.expire_code_at)

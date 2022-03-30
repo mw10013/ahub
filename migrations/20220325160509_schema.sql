@@ -8,7 +8,6 @@ create table AccessPoint (
 );
 create table AccessUser (
     id integer not null primary key,
-    name text not null default '',
     code text not null,
     activate_code_at datetime,
     expire_code_at datetime
