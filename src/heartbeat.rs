@@ -14,7 +14,7 @@ struct RequestData {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AccessHubRequestData {
-    id: i64,
+    id: String,
     #[serde(with = "json_option_naive_date_time")]
     cloud_last_access_event_at: Option<chrono::NaiveDateTime>,
     access_events: Vec<AccessEventRequestData>,
@@ -40,7 +40,7 @@ struct ResponseData {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AccessHubResponseData {
-    id: i64,
+    id: String,
     #[serde(with = "json_naive_date_time")]
     cloud_last_access_event_at: chrono::NaiveDateTime,
     access_users: Vec<AccessUserResponseData>,
@@ -197,7 +197,7 @@ pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Resu
 
     let request_data = RequestData {
         access_hub: AccessHubRequestData {
-            id: hub.id,
+            id: hub.id.clone(),
             cloud_last_access_event_at: hub.cloud_last_access_event_at,
             access_events: events,
         },

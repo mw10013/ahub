@@ -1,5 +1,5 @@
 create table AccessHub (
-    id integer not null primary key,
+    id text not null primary key,
     cloud_last_access_event_at datetime
 );
 create table AccessPoint (

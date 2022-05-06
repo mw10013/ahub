@@ -1,6 +1,6 @@
 #[derive(Debug, sqlx::FromRow)]
 pub struct Hub {
-    pub id: i64,
+    pub id: String,
     pub cloud_last_access_event_at: Option<chrono::NaiveDateTime>,
 }
 
