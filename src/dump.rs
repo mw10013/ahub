@@ -1,12 +1,15 @@
-use crate::domain::{Event, Hub, Point, Point2User, PointWithRelations, User, UserWithRelations, ActiveCode};
+use crate::domain::{
+    ActiveCode, Event, Hub, Point, Point2User, PointWithRelations, User, UserWithRelations,
+};
 use futures::TryStreamExt;
 use sqlx::SqliteConnection;
 use std::collections::HashMap;
 
 pub async fn dump_hub(conn: &mut SqliteConnection) -> anyhow::Result<()> {
-    let hub: Hub = sqlx::query_as("select id, cloud_last_access_event_at from AccessHub")
-        .fetch_one(conn)
-        .await?;
+    let hub: Hub =
+        sqlx::query_as("select id, api_token, cloud_last_access_event_at from AccessHub")
+            .fetch_one(conn)
+            .await?;
     println!("{:#?}", hub);
     Ok(())
 }
@@ -200,9 +203,10 @@ pub async fn dump_points(take: i32, skip: i32, conn: &mut SqliteConnection) -> a
 pub async fn dump_codes(conn: &mut SqliteConnection) -> anyhow::Result<()> {
     let codes = sqlx::query_as::<_, ActiveCode>(
         r#"select access_point_id, position, code, access_user_id, activate_code_at, expire_code_at
-        from ActiveCode"#)
-        .fetch_all(&mut *conn)
-        .await?;
+        from ActiveCode"#,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
     println!("codes {:#?}", codes);
 
     Ok(())

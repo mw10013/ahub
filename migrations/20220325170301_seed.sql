@@ -1,4 +1,5 @@
-INSERT INTO AccessHub VALUES("cl2uwi6uv0030ybthbkls5w0i", null);
+INSERT INTO AccessHub VALUES("cl2uwi6uv0030ybthbkls5w0i", 
+    "d627713660c1891414ac55a6ccd1c1294292bb19a9e6be741f340782a531e331", null);
 
 INSERT INTO AccessPoint VALUES(1, 1);
 INSERT INTO AccessPoint VALUES(2, 2);
