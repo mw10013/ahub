@@ -1,6 +1,6 @@
 create table AccessHub (
     id text not null primary key,
-    api_token text,
+    api_token text not null default "",
     cloud_last_access_event_at datetime
 );
 create table AccessPoint (

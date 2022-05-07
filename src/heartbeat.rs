@@ -15,6 +15,7 @@ struct RequestData {
 #[serde(rename_all = "camelCase")]
 struct AccessHubRequestData {
     id: String,
+    api_token: String,
     #[serde(with = "json_option_naive_date_time")]
     cloud_last_access_event_at: Option<chrono::NaiveDateTime>,
     access_events: Vec<AccessEventRequestData>,
@@ -175,10 +176,15 @@ mod json_option_naive_date_time {
 
 pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Result<()> {
     let mut conn = SqliteConnection::connect(database_url).await?;
-    let hub: Hub = sqlx::query_as("select id, api_token, cloud_last_access_event_at from AccessHub")
-        .fetch_one(&mut conn)
-        .await?;
+    let hub: Hub =
+        sqlx::query_as("select id, api_token, cloud_last_access_event_at from AccessHub")
+            .fetch_one(&mut conn)
+            .await?;
     println!("{:#?}", hub);
+
+    if hub.api_token.is_empty() {
+        return Err(anyhow::anyhow!("Missing api token"));
+    }
 
     let events: Vec<AccessEventRequestData> = match hub.cloud_last_access_event_at {
         Some(cloud_last_access_event_at) => {
@@ -198,6 +204,7 @@ pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Resu
     let request_data = RequestData {
         access_hub: AccessHubRequestData {
             id: hub.id.clone(),
+            api_token: hub.api_token.clone(),
             cloud_last_access_event_at: hub.cloud_last_access_event_at,
             access_events: events,
         },
