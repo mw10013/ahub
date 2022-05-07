@@ -175,7 +175,7 @@ mod json_option_naive_date_time {
 
 pub async fn heartbeat(access_api_url: &str, database_url: &str) -> anyhow::Result<()> {
     let mut conn = SqliteConnection::connect(database_url).await?;
-    let hub: Hub = sqlx::query_as("select id, cloud_last_access_event_at from AccessHub")
+    let hub: Hub = sqlx::query_as("select id, api_token, cloud_last_access_event_at from AccessHub")
         .fetch_one(&mut conn)
         .await?;
     println!("{:#?}", hub);
