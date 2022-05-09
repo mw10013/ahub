@@ -38,6 +38,8 @@ cargo run dump events
 cargo run dump users -t2
 cargo run mock grant -u1 -p1
 cargo run mock deny -p1 -c666
+cargo run token
+cargo run token --set d627713660c1891414ac55a6ccd1c1294292bb19a9e6be741f340782a531e331
 cargo run heartbeat
 ```
 
