@@ -1,12 +1,13 @@
 use clap::{Parser, Subcommand};
 use sqlx::{Connection, SqliteConnection};
 
+mod access;
 mod domain;
 mod dump;
 mod heartbeat;
 mod mock;
-mod access;
 mod sandbox;
+mod token;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -44,6 +45,16 @@ enum Command {
         /// Location of the DB, by default will be read from the DATABASE_URL env var
         #[clap(long, short = 'D', env)]
         database_url: String,
+    },
+    /// API token
+    Token {
+        /// Location of the DB, by default will be read from the DATABASE_URL env var
+        #[clap(long, short = 'D', env)]
+        database_url: String,
+
+        /// Set
+        #[clap(short, long, default_value_t = String::from(""))]
+        set: String,
     },
     /// Access with code for point at position. Position is 1-based. Returns "GRANT" | "DENY"
     Access {
@@ -176,6 +187,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
+        Command::Token { database_url, set } => token::token(&set, &database_url).await?,
         Command::Heartbeat {
             access_api_url,
             database_url,
