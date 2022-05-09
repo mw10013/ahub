@@ -3,7 +3,7 @@ use crate::domain::Hub;
 use sqlx::{Connection, SqliteConnection};
 
 pub async fn token(set: &str, database_url: &str) -> anyhow::Result<()> {
-    let mut conn = SqliteConnection::connect(&database_url).await?;
+    let mut conn = SqliteConnection::connect(database_url).await?;
 
     let hub: Hub =
         sqlx::query_as("select id, api_token, cloud_last_access_event_at from AccessHub")
