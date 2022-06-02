@@ -42,7 +42,9 @@ cargo run token
 cargo run token --set <token>
 cargo run access -c <code> -p <position>
 cargo run heartbeat
-cargo run heartbeat -a <api_url>
+cargo run heartbeat -a <api_url with no trailing slash>
+
+cargo build --release -v # Outputs to target/release. Must create .env
 ```
 
 ## Sqlx CLI cheatsheet
